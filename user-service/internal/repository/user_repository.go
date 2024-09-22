@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/alimikegami/e-commerce/user-service/internal/domain"
+	pkgdto "github.com/alimikegami/e-commerce/user-service/pkg/dto"
 	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
 	"github.com/rs/zerolog/log"
+
 	"gorm.io/gorm"
 )
 
@@ -15,6 +17,8 @@ type UserRepository interface {
 	AddUser(ctx context.Context, data domain.User) (id int64, err error)
 	GetUserByID(ctx context.Context, id int64) (data domain.User, err error)
 	UpdateUser(ctx context.Context, data domain.User) (err error)
+	GetUsers(ctx context.Context, filter pkgdto.Filter) (data []domain.User, err error)
+	CountUsers(ctx context.Context, filter pkgdto.Filter) (count int64, err error)
 }
 
 type UserRepositoryImpl struct {
@@ -55,6 +59,7 @@ func (r *UserRepositoryImpl) AddUser(ctx context.Context, data domain.User) (id 
 		HashedPassword: data.HashedPassword,
 		UserID:         data.ID,
 		ExternalID:     data.ExternalID,
+		RoleID:         data.RoleID,
 		CreatedAt:      timestamp,
 		UpdatedAt:      timestamp,
 	}).Error
@@ -122,6 +127,7 @@ func (r *UserRepositoryImpl) UpdateUser(ctx context.Context, data domain.User) (
 		ExternalID: data.ExternalID,
 		CreatedAt:  timestamp,
 		UpdatedAt:  timestamp,
+		RoleID:     data.RoleID,
 	}).Error
 
 	if err != nil {
@@ -141,6 +147,45 @@ func (r *UserRepositoryImpl) GetUserByID(ctx context.Context, id int64) (data do
 		if err == gorm.ErrRecordNotFound {
 			return data, nil
 		}
+		return
+	}
+
+	return
+}
+
+func (r *UserRepositoryImpl) GetUsers(ctx context.Context, filter pkgdto.Filter) (data []domain.User, err error) {
+	query := r.db.WithContext(ctx).Where("deleted_at IS NULL").Preload("Role")
+
+	if filter.Limit != 0 && filter.Page != 0 {
+		query = query.Limit(filter.Limit).Offset((filter.Page - 1) * filter.Limit)
+	}
+
+	if filter.Q != "" {
+		query = query.Where("name LIKE ?", "%"+filter.Q+"%")
+	}
+
+	err = query.Find(&data).Error
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetUsers").Msg("")
+		if err == gorm.ErrRecordNotFound {
+			return data, nil
+		}
+
+		return
+	}
+
+	return
+}
+
+func (r *UserRepositoryImpl) CountUsers(ctx context.Context, filter pkgdto.Filter) (count int64, err error) {
+	query := r.db.WithContext(ctx).Model(&domain.User{}).Where("deleted_at IS NULL").Select("COUNT(*)")
+	if filter.Q != "" {
+		query = query.Where("name LIKE ?", "%"+filter.Q+"%")
+	}
+
+	err = query.Scan(&count).Error
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetUsers").Msg("")
 		return
 	}
 

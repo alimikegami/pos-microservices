@@ -7,19 +7,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type Pagination struct {
-	Previous *string     `json:"previous"`
-	Next     *string     `json:"next"`
-	Records  interface{} `json:"records"`
-}
-
 type PaginationMetadata struct {
 	TotalCount uint64 `json:"total_count"`
 	Page       uint64 `json:"page"`
 	Limit      int    `json:"limit"`
 }
 
-type LimitOffsetPagination struct {
+type Pagination struct {
 	Metadata PaginationMetadata `json:"_metadata"`
 	Records  interface{}        `json:"records"`
 }

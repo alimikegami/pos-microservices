@@ -41,13 +41,6 @@ type ErrorResponse struct {
 	Errors  interface{} `json:"errors"`
 }
 
-type Filter struct {
-	Limit      int      `query:"limit"`
-	Page       int      `query:"page"`
-	Q          string   `query:"q"`
-	ProductIds []string `json:"product_ids"`
-}
-
 func WriteSuccessResponse(c echo.Context, message string) error {
 	resp := SuccessResponse{}
 	resp.Status = "success"
