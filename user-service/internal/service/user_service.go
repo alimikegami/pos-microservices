@@ -10,6 +10,7 @@ import (
 	"github.com/alimikegami/e-commerce/user-service/internal/domain"
 	"github.com/alimikegami/e-commerce/user-service/internal/dto"
 	"github.com/alimikegami/e-commerce/user-service/internal/repository"
+	pkgdto "github.com/alimikegami/e-commerce/user-service/pkg/dto"
 	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
 	"github.com/alimikegami/e-commerce/user-service/pkg/utils"
 	"github.com/oklog/ulid/v2"
@@ -22,6 +23,7 @@ type UserService interface {
 	AddUser(ctx context.Context, data dto.UserRequest) (err error)
 	Login(ctx context.Context, payload dto.UserRequest) (respPayload dto.LoginResponse, err error)
 	UpdateUser(ctx context.Context, payload dto.UserRequest) (err error)
+	GetUsers(ctx context.Context, filter pkgdto.Filter) (resp pkgdto.Pagination, err error)
 }
 
 type ServiceImpl struct {
@@ -54,6 +56,7 @@ func (s *ServiceImpl) AddUser(ctx context.Context, data dto.UserRequest) (err er
 		Email:          data.Email,
 		HashedPassword: string(hash),
 		ExternalID:     ulid.Make().String(),
+		RoleID:         data.RoleID,
 	}
 
 	_, err = s.repo.AddUser(ctx, userEnt)
@@ -110,6 +113,7 @@ func (s *ServiceImpl) UpdateUser(ctx context.Context, payload dto.UserRequest) e
 		Email:          userData.Email,
 		HashedPassword: userData.HashedPassword,
 		ExternalID:     userData.ExternalID,
+		RoleID:         userData.RoleID,
 	}
 
 	if err := s.repo.UpdateUser(ctx, updatedUserData); err != nil {
@@ -145,6 +149,36 @@ func (s *ServiceImpl) UpdateUser(ctx context.Context, payload dto.UserRequest) e
 	}
 
 	return nil
+}
+
+func (s *ServiceImpl) GetUsers(ctx context.Context, filter pkgdto.Filter) (resp pkgdto.Pagination, err error) {
+	datas, err := s.repo.GetUsers(ctx, filter)
+	if err != nil {
+		return
+	}
+
+	userCount, err := s.repo.CountUsers(ctx, filter)
+	if err != nil {
+		return
+	}
+
+	var users []dto.UserResponse
+
+	for _, data := range datas {
+		users = append(users, dto.UserResponse{
+			ID:         data.ID,
+			ExternalID: data.ExternalID,
+			Name:       data.Name,
+			Email:      data.Email,
+		})
+	}
+
+	resp.Records = users
+	resp.Metadata.Limit = filter.Limit
+	resp.Metadata.Page = uint64(filter.Page)
+	resp.Metadata.TotalCount = uint64(userCount)
+
+	return
 }
 
 func (s *ServiceImpl) writeKafkaMessage(msg []byte) error {
