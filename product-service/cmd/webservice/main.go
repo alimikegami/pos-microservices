@@ -59,8 +59,9 @@ func main() {
 		},
 	})
 
-	repo := repository.CreateNewRepository(db, elasticSearchClient)
-	svc := service.CreateProductService(repo, *config, kafkaReader, kafkaProducer)
+	mongoDBRepo := repository.CreateNewMongoDBRepository(db)
+	elasticSearchRepo := repository.CreateNewElasticSearchRepository(elasticSearchClient)
+	svc := service.CreateProductService(mongoDBRepo, elasticSearchRepo, *config, kafkaReader, kafkaProducer)
 	controller.CreateProductController(g, svc, IsLoggedIn)
 
 	g.GET("/ping", func(c echo.Context) error {

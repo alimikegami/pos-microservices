@@ -9,15 +9,18 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type ProductRepository interface {
+type MongoDBProductRepository interface {
 	AddProduct(ctx context.Context, data domain.Product) (id primitive.ObjectID, err error)
 	GetProducts(ctx context.Context, param pkgdto.Filter) (data []domain.Product, err error)
 	UpdateSellerDetails(ctx context.Context, data dto.User) (err error)
-	AddProductToElasticsearch(ctx context.Context, index string, data dto.ProductResponse) (err error)
-	GetProductsFromElasticsearch(ctx context.Context, filter pkgdto.Filter) ([]dto.ProductResponse, int, error)
 	GetProductByIDs(ctx context.Context, ids []string) (data []domain.Product, err error)
-	HandleTrx(ctx context.Context, fn func(repo ProductRepository) error) error
+	HandleTrx(ctx context.Context, fn func(repo MongoDBProductRepository) error) error
 	ReduceProductQuantity(ctx context.Context, productID string, quantity int) error
 	GetProductByID(ctx context.Context, id string) (product domain.Product, err error)
+}
+
+type ElasticSearchProductRepository interface {
+	AddProduct(ctx context.Context, index string, data dto.ProductResponse) (err error)
+	GetProducts(ctx context.Context, filter pkgdto.Filter) ([]dto.ProductResponse, int, error)
 	UpdateProductQuantities(ctx context.Context, products []domain.Product) error
 }

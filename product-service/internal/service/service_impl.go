@@ -18,18 +18,19 @@ import (
 )
 
 type ProductServiceImpl struct {
-	repo          repository.ProductRepository
-	config        config.Config
-	kafkaReader   *kafka.Reader
-	kafkaProducer *kafka.Conn
+	mongoDBRepo       repository.MongoDBProductRepository
+	elasticSearchRepo repository.ElasticSearchProductRepository
+	config            config.Config
+	kafkaReader       *kafka.Reader
+	kafkaProducer     *kafka.Conn
 }
 
-func CreateProductService(repo repository.ProductRepository, config config.Config, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn) ProductService {
-	return &ProductServiceImpl{repo: repo, config: config, kafkaReader: kafkaReader, kafkaProducer: kafkaProducer}
+func CreateProductService(mongoDBRepo repository.MongoDBProductRepository, elasticSearchRepo repository.ElasticSearchProductRepository, config config.Config, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn) ProductService {
+	return &ProductServiceImpl{mongoDBRepo: mongoDBRepo, elasticSearchRepo: elasticSearchRepo, config: config, kafkaReader: kafkaReader, kafkaProducer: kafkaProducer}
 }
 
 func (s *ProductServiceImpl) AddProduct(ctx context.Context, data dto.ProductRequest) (err error) {
-	productId, err := s.repo.AddProduct(ctx, domain.Product{
+	productId, err := s.mongoDBRepo.AddProduct(ctx, domain.Product{
 		Name:        data.Name,
 		Description: data.Description,
 		Quantity:    data.Quantity,
@@ -78,7 +79,7 @@ func (s *ProductServiceImpl) AddProduct(ctx context.Context, data dto.ProductReq
 }
 
 func (s *ProductServiceImpl) GetProducts(ctx context.Context, filter pkgdto.Filter) (responsePayload pkgdto.PaginationResponse, err error) {
-	data, total, err := s.repo.GetProductsFromElasticsearch(ctx, filter)
+	data, total, err := s.elasticSearchRepo.GetProducts(ctx, filter)
 	if err != nil {
 		return
 	}
@@ -89,19 +90,19 @@ func (s *ProductServiceImpl) GetProducts(ctx context.Context, filter pkgdto.Filt
 }
 
 func (s *ProductServiceImpl) UpdateSellerDetails(ctx context.Context, data dto.User) (err error) {
-	err = s.repo.UpdateSellerDetails(context.Background(), data)
+	err = s.mongoDBRepo.UpdateSellerDetails(context.Background(), data)
 
 	return
 }
 
 func (s *ProductServiceImpl) AddProductToElasticsearch(ctx context.Context, data dto.ProductResponse) (err error) {
-	err = s.repo.AddProductToElasticsearch(ctx, "products", data)
+	err = s.elasticSearchRepo.AddProduct(ctx, "products", data)
 
 	return
 }
 
 func (s *ProductServiceImpl) UpdateElasticSearchProductQuantity(ctx context.Context, data []domain.Product) (err error) {
-	err = s.repo.UpdateProductQuantities(ctx, data)
+	err = s.elasticSearchRepo.UpdateProductQuantities(ctx, data)
 
 	return
 }
@@ -200,7 +201,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 }
 
 func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto.OrderRequest) (err error) {
-	err = s.repo.HandleTrx(ctx, func(repo repository.ProductRepository) error {
+	err = s.mongoDBRepo.HandleTrx(ctx, func(repo repository.MongoDBProductRepository) error {
 		for _, orderItem := range req.OrderItems {
 			product, err := repo.GetProductByID(ctx, orderItem.ProductID)
 			if err != nil {
