@@ -17,10 +17,12 @@ type MongoDBProductRepository interface {
 	HandleTrx(ctx context.Context, fn func(repo MongoDBProductRepository) error) error
 	ReduceProductQuantity(ctx context.Context, productID string, quantity int) error
 	GetProductByID(ctx context.Context, id string) (product domain.Product, err error)
+	DeleteProduct(ctx context.Context, id string) (err error)
 }
 
 type ElasticSearchProductRepository interface {
 	AddProduct(ctx context.Context, index string, data dto.ProductResponse) (err error)
 	GetProducts(ctx context.Context, filter pkgdto.Filter) ([]dto.ProductResponse, int, error)
 	UpdateProductQuantities(ctx context.Context, products []domain.Product) error
+	DeleteProduct(ctx context.Context, id string) error
 }

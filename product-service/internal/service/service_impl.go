@@ -194,6 +194,26 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			}
 
 			fmt.Println("product data updated successfully")
+		case "delete_product":
+			var product dto.Product
+			dataBytes, err := json.Marshal(receivedMsg.Data)
+			if err != nil {
+				fmt.Println("Error marshalling user data:", err)
+				continue
+			}
+
+			if err := json.Unmarshal(dataBytes, &product); err != nil {
+				fmt.Println("Error unmarshalling user data:", err)
+				continue
+			}
+
+			err = s.elasticSearchRepo.DeleteProduct(context.Background(), product.ID)
+			if err != nil {
+				fmt.Println("Error:", err)
+				continue
+			}
+
+			fmt.Println("product data deleted successfully")
 		default:
 			fmt.Printf("Unknown event type: %s\n", receivedMsg.EventType)
 		}
@@ -241,6 +261,42 @@ func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto
 	kafkaMsg := dto.KafkaMessage{
 		EventType: "update_product_quantity",
 		Data:      products,
+	}
+
+	jsonMsg, err := json.Marshal(kafkaMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Kafka message: %w", err)
+	}
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		err = s.writeKafkaMessage(jsonMsg)
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
+	}
+
+	return
+}
+
+func (s *ProductServiceImpl) DeleteProduct(ctx context.Context, id string) (err error) {
+	err = s.mongoDBRepo.DeleteProduct(ctx, id)
+
+	if err != nil {
+		return
+	}
+
+	kafkaMsg := dto.KafkaMessage{
+		EventType: "delete_product",
+		Data: dto.Product{
+			ID: id,
+		},
 	}
 
 	jsonMsg, err := json.Marshal(kafkaMsg)

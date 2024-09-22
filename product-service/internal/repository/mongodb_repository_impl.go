@@ -7,6 +7,7 @@ import (
 	"github.com/alimikegami/point-of-sales/product-service/internal/domain"
 	"github.com/alimikegami/point-of-sales/product-service/internal/dto"
 	pkgdto "github.com/alimikegami/point-of-sales/product-service/pkg/dto"
+	"github.com/alimikegami/point-of-sales/product-service/pkg/errs"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -186,4 +187,24 @@ func (r *MongoDBProductRepositoryImpl) ReduceProductQuantity(ctx context.Context
 	}
 
 	return nil
+}
+
+func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id string) (err error) {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return fmt.Errorf("invalid product ID: %v", err)
+	}
+
+	filter := bson.M{"_id": objectID}
+	opts := options.Delete().SetHint(bson.D{{Key: "_id", Value: 1}})
+	result, err := r.db.Collection("products").DeleteOne(context.TODO(), filter, opts)
+	if err != nil {
+		return fmt.Errorf("failed to delete product: %v", err)
+	}
+
+	if result.DeletedCount == 0 {
+		return errs.ErrNotFound
+	}
+
+	return
 }

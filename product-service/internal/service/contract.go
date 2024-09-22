@@ -13,4 +13,5 @@ type ProductService interface {
 	ConsumeEvent()
 	UpdateSellerDetails(ctx context.Context, data dto.User) (err error)
 	UpdateProductsQuantity(ctx context.Context, req dto.OrderRequest) (err error)
+	DeleteProduct(ctx context.Context, id string) (err error)
 }

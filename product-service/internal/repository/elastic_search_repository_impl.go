@@ -204,3 +204,24 @@ func (r *ElasticSearchProductRepositoryImpl) UpdateProductQuantities(ctx context
 
 	return nil
 }
+
+func (r *ElasticSearchProductRepositoryImpl) DeleteProduct(ctx context.Context, id string) error {
+	res, err := r.elasticsearch.Delete(
+		"products",
+		id,
+		r.elasticsearch.Delete.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting document: %w", err)
+	}
+	defer res.Body.Close()
+
+	// Check if the operation was successful
+	if res.IsError() {
+		return fmt.Errorf("error deleting document: %s", res.String())
+	}
+
+	log.Printf("Document deleted successfully with ID: %s", id)
+
+	return nil
+}

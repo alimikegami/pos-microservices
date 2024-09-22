@@ -22,6 +22,7 @@ func CreateProductController(e *echo.Group, service service.ProductService, isLo
 	e.GET("/products", c.GetProducts)
 	e.POST("/products/prices", c.GetProductsPrice)
 	e.PUT("/products/quantity", c.UpdateProductsQuantity)
+	e.DELETE("/products/:id", c.DeleteProduct)
 }
 
 func (c *Controller) AddProduct(e echo.Context) error {
@@ -85,6 +86,16 @@ func (c *Controller) UpdateProductsQuantity(e echo.Context) error {
 	}
 
 	err = c.service.UpdateProductsQuantity(e.Request().Context(), payload)
+	if err != nil {
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	return response.WriteSuccessResponse(e, "", nil)
+}
+
+func (c *Controller) DeleteProduct(e echo.Context) error {
+	id := e.Param("id")
+	err := c.service.DeleteProduct(e.Request().Context(), id)
 	if err != nil {
 		return response.WriteErrorResponse(e, err, nil)
 	}
