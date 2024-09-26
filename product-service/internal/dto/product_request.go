@@ -1,6 +1,7 @@
 package dto
 
 type ProductRequest struct {
+	ID          string
 	Name        string `json:"name"`
 	Quantity    uint64 `json:"quantity"`
 	Description string `json:"description"`

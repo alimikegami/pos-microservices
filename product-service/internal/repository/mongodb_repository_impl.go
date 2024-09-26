@@ -87,7 +87,7 @@ func (r *MongoDBProductRepositoryImpl) UpdateSellerDetails(ctx context.Context, 
 		"$set": bson.M{"user_name": data.Name},
 	}
 
-	_, err = r.db.Collection("products").UpdateMany(ctx, filter, update)
+	_, err = r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -116,27 +116,23 @@ func (r *MongoDBProductRepositoryImpl) GetProductByID(ctx context.Context, id st
 }
 
 func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(repo MongoDBProductRepository) error) error {
-	// Start a session
 	session, err := r.db.Client().StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to start session: %v", err)
 	}
 	defer session.EndSession(ctx)
 
-	// Start a transaction
 	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		// Create a new repository instance with the transaction session
 		newRepo := &MongoDBProductRepositoryImpl{
 			db: r.db,
 		}
 
-		// Execute the provided function
 		err := fn(newRepo)
 		if err != nil {
-			return nil, err // This will cause the transaction to be aborted
+			return nil, err
 		}
 
-		return nil, nil // This will cause the transaction to be committed
+		return nil, nil
 	})
 
 	if err != nil {
@@ -147,32 +143,26 @@ func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(re
 }
 
 func (r *MongoDBProductRepositoryImpl) ReduceProductQuantity(ctx context.Context, productID string, quantity int) error {
-	// Convert string ID to ObjectID
 	objectID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
 		return fmt.Errorf("invalid product ID: %v", err)
 	}
 
-	// Define the filter to find the product
 	filter := bson.M{"_id": objectID}
 
-	// Define the update to reduce the quantity
 	update := bson.M{
 		"$inc": bson.M{"quantity": -quantity},
 	}
 
-	// Perform the update
 	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("failed to update product quantity: %v", err)
 	}
 
-	// Check if a document was actually modified
 	if result.ModifiedCount == 0 {
 		return fmt.Errorf("no product found with ID %s", productID)
 	}
 
-	// Optionally, you might want to check if the quantity didn't go below zero
 	var product struct {
 		Quantity int `bson:"quantity"`
 	}
@@ -204,6 +194,32 @@ func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id str
 
 	if result.DeletedCount == 0 {
 		return errs.ErrNotFound
+	}
+
+	return
+}
+
+func (r *MongoDBProductRepositoryImpl) UpdateProduct(ctx context.Context, data domain.Product) (err error) {
+	filter := bson.D{{Key: "_id", Value: data.ID}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "name", Value: data.Name},
+		{Key: "description", Value: data.Description},
+		{Key: "price", Value: data.Price}}}}
+
+	_, err = r.db.Collection("products").UpdateOne(ctx, filter, update)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (r *MongoDBProductRepositoryImpl) UpdateProductQuantity(ctx context.Context, data domain.Product) (err error) {
+	filter := bson.D{{Key: "_id", Value: data.ID}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "quantity", Value: data.Quantity}}}}
+
+	_, err = r.db.Collection("products").UpdateOne(ctx, filter, update)
+	if err != nil {
+		return
 	}
 
 	return

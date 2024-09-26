@@ -101,8 +101,8 @@ func (s *ProductServiceImpl) AddProductToElasticsearch(ctx context.Context, data
 	return
 }
 
-func (s *ProductServiceImpl) UpdateElasticSearchProductQuantity(ctx context.Context, data []domain.Product) (err error) {
-	err = s.elasticSearchRepo.UpdateProductQuantities(ctx, data)
+func (s *ProductServiceImpl) DecreaseElasticSearchProductQuantity(ctx context.Context, data []domain.Product) (err error) {
+	err = s.elasticSearchRepo.DecreaseProductQuantities(ctx, data)
 
 	return
 }
@@ -174,7 +174,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			}
 
 			fmt.Println("product data indexed successfully")
-		case "update_product_quantity":
+		case "decrease_product_quantity":
 			var products []domain.Product
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
@@ -186,8 +186,26 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 				fmt.Println("Error unmarshalling user data:", err)
 				continue
 			}
+			err = s.DecreaseElasticSearchProductQuantity(context.Background(), products)
+			if err != nil {
+				fmt.Println("Error:", err)
+				continue
+			}
 
-			err = s.UpdateElasticSearchProductQuantity(context.Background(), products)
+			fmt.Println("product data updated successfully")
+		case "update_product_quantity":
+			var product domain.Product
+			dataBytes, err := json.Marshal(receivedMsg.Data)
+			if err != nil {
+				fmt.Println("Error marshalling user data:", err)
+				continue
+			}
+
+			if err := json.Unmarshal(dataBytes, &product); err != nil {
+				fmt.Println("Error unmarshalling user data:", err)
+				continue
+			}
+			err = s.elasticSearchRepo.UpdateProductQuantities(context.Background(), product)
 			if err != nil {
 				fmt.Println("Error:", err)
 				continue
@@ -208,6 +226,37 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			}
 
 			err = s.elasticSearchRepo.DeleteProduct(context.Background(), product.ID)
+			if err != nil {
+				fmt.Println("Error:", err)
+				continue
+			}
+
+			fmt.Println("product data deleted successfully")
+		case "update_product":
+			var product dto.Product
+			dataBytes, err := json.Marshal(receivedMsg.Data)
+			if err != nil {
+				fmt.Println("Error marshalling user data:", err)
+				continue
+			}
+
+			if err := json.Unmarshal(dataBytes, &product); err != nil {
+				fmt.Println("Error unmarshalling user data:", err)
+				continue
+			}
+
+			objectID, err := primitive.ObjectIDFromHex(product.ID)
+			if err != nil {
+				fmt.Printf("invalid product ID: %v\n", err)
+				continue
+			}
+
+			err = s.elasticSearchRepo.UpdateProduct(context.Background(), domain.Product{
+				ID:          objectID,
+				Name:        product.Name,
+				Description: product.Description,
+				Price:       product.Price,
+			})
 			if err != nil {
 				fmt.Println("Error:", err)
 				continue
@@ -259,7 +308,7 @@ func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto
 	}
 
 	kafkaMsg := dto.KafkaMessage{
-		EventType: "update_product_quantity",
+		EventType: "decrease_product_quantity",
 		Data:      products,
 	}
 
@@ -297,6 +346,102 @@ func (s *ProductServiceImpl) DeleteProduct(ctx context.Context, id string) (err 
 		Data: dto.Product{
 			ID: id,
 		},
+	}
+
+	jsonMsg, err := json.Marshal(kafkaMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Kafka message: %w", err)
+	}
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		err = s.writeKafkaMessage(jsonMsg)
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
+	}
+
+	return
+}
+
+func (s *ProductServiceImpl) UpdateProduct(ctx context.Context, data dto.ProductRequest) (err error) {
+	objectID, err := primitive.ObjectIDFromHex(data.ID)
+	if err != nil {
+		return fmt.Errorf("invalid product ID: %v", err)
+	}
+
+	updatedData := domain.Product{
+		ID:          objectID,
+		Name:        data.Name,
+		Description: data.Description,
+		Quantity:    data.Quantity,
+	}
+
+	err = s.mongoDBRepo.UpdateProduct(ctx, updatedData)
+	if err != nil {
+		return
+	}
+
+	kafkaMsg := dto.KafkaMessage{
+		EventType: "update_product",
+		Data: dto.Product{
+			ID:          data.ID,
+			Name:        data.Name,
+			Description: data.Description,
+			Price:       data.Price,
+		},
+	}
+
+	jsonMsg, err := json.Marshal(kafkaMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Kafka message: %w", err)
+	}
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		err = s.writeKafkaMessage(jsonMsg)
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
+	}
+
+	return
+}
+
+func (s *ProductServiceImpl) UpdateProductQuantity(ctx context.Context, req dto.ProductQuantityRequest) (err error) {
+	productData, err := s.mongoDBRepo.GetProductByID(ctx, req.ProductID)
+	if err != nil {
+		return
+	}
+
+	if req.Action == "add" {
+		productData.Quantity += req.Quantity
+	} else if req.Action == "reduce" {
+		productData.Quantity -= req.Quantity
+	} else {
+		return errs.ErrClient
+	}
+
+	err = s.mongoDBRepo.UpdateProductQuantity(ctx, productData)
+	if err != nil {
+		return
+	}
+
+	kafkaMsg := dto.KafkaMessage{
+		EventType: "update_product_quantity",
+		Data:      productData,
 	}
 
 	jsonMsg, err := json.Marshal(kafkaMsg)

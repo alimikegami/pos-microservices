@@ -146,7 +146,7 @@ func (r *ElasticSearchProductRepositoryImpl) GetProducts(ctx context.Context, fi
 	return products, total, nil
 }
 
-func (r *ElasticSearchProductRepositoryImpl) UpdateProductQuantities(ctx context.Context, products []domain.Product) error {
+func (r *ElasticSearchProductRepositoryImpl) DecreaseProductQuantities(ctx context.Context, products []domain.Product) error {
 	var buf bytes.Buffer
 
 	for _, product := range products {
@@ -205,6 +205,63 @@ func (r *ElasticSearchProductRepositoryImpl) UpdateProductQuantities(ctx context
 	return nil
 }
 
+func (r *ElasticSearchProductRepositoryImpl) UpdateProductQuantities(ctx context.Context, product domain.Product) error {
+	var buf bytes.Buffer
+
+	// Create the update action
+	action := map[string]interface{}{
+		"update": map[string]interface{}{
+			"_index": "products",
+			"_id":    product.ID.Hex(),
+		},
+	}
+
+	// Create the update script
+	script := map[string]interface{}{
+		"script": map[string]interface{}{
+			"source": "ctx._source.quantity = params.newQuantity",
+			"lang":   "painless",
+			"params": map[string]interface{}{
+				"newQuantity": product.Quantity,
+			},
+		},
+	}
+
+	// Encode the action and script
+	if err := json.NewEncoder(&buf).Encode(action); err != nil {
+		return fmt.Errorf("error encoding action: %w", err)
+	}
+	if err := json.NewEncoder(&buf).Encode(script); err != nil {
+		return fmt.Errorf("error encoding script: %w", err)
+	}
+
+	// Perform the bulk update
+	res, err := r.elasticsearch.Bulk(bytes.NewReader(buf.Bytes()),
+		r.elasticsearch.Bulk.WithContext(ctx),
+		r.elasticsearch.Bulk.WithIndex("products"),
+	)
+	if err != nil {
+		return fmt.Errorf("error performing bulk update: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("bulk update failed: %s", res.String())
+	}
+
+	// Check for individual failures
+	var bulkResponse map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&bulkResponse); err != nil {
+		return fmt.Errorf("error parsing the response body: %w", err)
+	}
+
+	if bulkResponse["errors"].(bool) {
+		return fmt.Errorf("some updates failed: %v", bulkResponse)
+	}
+
+	return nil
+}
+
 func (r *ElasticSearchProductRepositoryImpl) DeleteProduct(ctx context.Context, id string) error {
 	res, err := r.elasticsearch.Delete(
 		"products",
@@ -222,6 +279,34 @@ func (r *ElasticSearchProductRepositoryImpl) DeleteProduct(ctx context.Context, 
 	}
 
 	log.Printf("Document deleted successfully with ID: %s", id)
+
+	return nil
+}
+
+func (r *ElasticSearchProductRepositoryImpl) UpdateProduct(ctx context.Context, data domain.Product) (err error) {
+	docBytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("error marshaling document: %w", err)
+	}
+
+	res, err := r.elasticsearch.Index(
+		"products",
+		bytes.NewReader(docBytes),
+		r.elasticsearch.Index.WithDocumentID(data.ID.Hex()),
+		r.elasticsearch.Index.WithContext(ctx),
+	)
+
+	if err != nil {
+		return fmt.Errorf("error indexing document: %w", err)
+	}
+
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error indexing document: %s", res.String())
+	}
+
+	log.Printf("Document indexed successfully with ID: %s", data.ID)
 
 	return nil
 }
