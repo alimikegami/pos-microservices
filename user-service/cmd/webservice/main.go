@@ -39,5 +39,5 @@ func main() {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
-	e.Logger.Fatal(e.Start(":8082"))
+	e.Logger.Fatal(e.Start(":8080"))
 }
