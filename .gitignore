@@ -1,1 +1,5 @@
 .vscode
+
+user-service/deployment/kubernetes/configmap.yaml
+order-service/deployment/kubernetes/configmap.yaml
+product-service/deployment/kubernetes/configmap.yaml

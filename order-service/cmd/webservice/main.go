@@ -7,6 +7,7 @@ import (
 	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/controller"
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/database/postgres"
+	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/message-queue/kafka"
 	paymentgateway "github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/payment-gateway"
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
@@ -25,6 +26,9 @@ func main() {
 	config := config.CreateNewConfig()
 
 	midtransClient := paymentgateway.CreateMidtransClient(config)
+
+	kafkaProducer := kafka.CreateKafkaProducer(config)
+	kafkaReader := kafka.CreateKafkaReader(config)
 
 	db, err := postgres.GetDBInstance(config)
 	if err != nil {
@@ -53,7 +57,7 @@ func main() {
 	})
 
 	orderRepo := repository.CreateOrderRepository(db)
-	orderSvc := service.CreateOrderService(orderRepo, midtransClient)
+	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer)
 	controller.CreateOrderController(g, orderSvc, IsLoggedIn)
 
 	e.Logger.Fatal(e.Start(":8080"))

@@ -21,3 +21,8 @@ type Product struct {
 	UserName    string  `json:"user_name"`
 	Price       float64 `json:"price"`
 }
+
+type StockUpdate struct {
+	TransactionNumber string `json:"transaction_number"`
+	Status            bool   `json:"status"`
+}

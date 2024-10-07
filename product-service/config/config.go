@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	ServicePort         string
 	MongoDBConfig       MongoDBConfig
 	KafkaConfig         KafkaConfig
 	ElasticsearchConfig ElasticsearchConfig
@@ -18,6 +19,7 @@ func CreateNewConfig() *Config {
 	godotenv.Load(".env")
 
 	conf := Config{
+		ServicePort: os.Getenv("SERVICE_PORT"),
 		MongoDBConfig: MongoDBConfig{
 			DBHost: os.Getenv("DB_HOST"),
 			DBPort: os.Getenv("DB_PORT"),

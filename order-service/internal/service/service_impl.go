@@ -4,43 +4,62 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/alimikegami/point-of-sales/order-service/internal/domain"
 	"github.com/alimikegami/point-of-sales/order-service/internal/dto"
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
+	pkgdto "github.com/alimikegami/point-of-sales/order-service/pkg/dto"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/errs"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/httpclient"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/midtrans/midtrans-go"
 	"github.com/midtrans/midtrans-go/coreapi"
+	"github.com/segmentio/kafka-go"
 )
 
 type OrderServiceImpl struct {
 	repository     repository.OrderRepository
 	midtransClient *coreapi.Client
+	kafkaReader    *kafka.Reader
+	kafkaProducer  *kafka.Conn
 }
 
-func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client) OrderService {
+func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn) OrderService {
 	return &OrderServiceImpl{
 		repository:     repository,
 		midtransClient: midtransClient,
+		kafkaReader:    kafkaReader,
+		kafkaProducer:  kafkaProducer,
 	}
 }
 
 func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (err error) {
+	trxNumber, err := uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("error generating transaction number: %v", err)
+	}
+
+	var productReqPayload dto.OrderProductServiceRequest
+	productReqPayload.TransactionNumber = trxNumber.String()
+	for _, item := range req.OrderItems {
+		productReqPayload.OrderItems = append(productReqPayload.OrderItems, dto.OrderItem{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+		})
+	}
+
 	err = s.repository.HandleTrx(ctx, func(repo repository.OrderRepository) error {
 		var orderDetails []domain.OrderDetail
 
-		// Prepare product IDs for price info request
 		productIDs := make([]string, len(req.OrderItems))
 		for i, item := range req.OrderItems {
 			productIDs[i] = item.ProductID
 		}
 
-		// Create and marshal the product price info request
 		priceInfoReq := dto.ProductRequest{
 			ProductIds: productIDs,
 		}
@@ -49,7 +68,6 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			return fmt.Errorf("error marshalling price info request: %v", err)
 		}
 
-		// Make API call to get product price info
 		priceInfoHttpReq := httpclient.HttpRequest{
 			URL:    "http://localhost:8081/api/v1/products/prices",
 			Method: "POST",
@@ -73,46 +91,37 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			return fmt.Errorf("error unmarshalling price info response: %v", err)
 		}
 
-		// Prepare quantity reduction request
-		var productReqPayload dto.OrderProductServiceRequest
-		for _, item := range req.OrderItems {
-			productReqPayload.OrderItems = append(productReqPayload.OrderItems, dto.OrderItem{
-				ProductID: item.ProductID,
-				Quantity:  item.Quantity,
-			})
+		kafkaMsg := dto.KafkaMessage{
+			EventType: "order_created",
+			Data:      productReqPayload,
 		}
 
-		// Marshal the quantity reduction request
-		quantityReductionJsonBody, err := json.Marshal(productReqPayload)
+		fmt.Printf("%+v\n", kafkaMsg)
+		jsonMsg, err := json.Marshal(kafkaMsg)
 		if err != nil {
-			return fmt.Errorf("error marshalling quantity reduction request: %v", err)
+			return fmt.Errorf("failed to marshal Kafka message: %w", err)
 		}
 
-		// Make API call to reduce quantity
-		quantityReductionReq := httpclient.HttpRequest{
-			URL:    "http://localhost:8081/api/v1/products/quantity",
-			Method: "PUT",
-			Body:   quantityReductionJsonBody,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
+		maxRetries := 3
+
+		for i := 0; i < maxRetries; i++ {
+			err = s.writeKafkaMessage(jsonMsg)
+			if err == nil {
+				break
+			}
+			log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+			time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
 		}
 
-		statusCode, quantityReductionBody, err := httpclient.SendRequest(quantityReductionReq)
 		if err != nil {
-			return fmt.Errorf("error calling quantity reduction service: %v", err)
-		}
-		if statusCode != http.StatusOK {
-			return fmt.Errorf("quantity reduction service returned non-OK status: %d", statusCode)
+			return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
 		}
 
-		// Parse the quantity reduction response
-		var quantityReductionResponse dto.ProductResponse
-		if err := json.Unmarshal(quantityReductionBody, &quantityReductionResponse); err != nil {
-			return fmt.Errorf("error unmarshalling quantity reduction response: %v", err)
+		err = s.listenForProductStockUpdate(trxNumber.String())
+		if err != nil {
+			return err
 		}
 
-		// Calculate total amount and prepare items for charge request
 		var totalAmount float64
 		chargeItems := make([]midtrans.ItemDetails, len(req.OrderItems))
 		for i, item := range req.OrderItems {
@@ -144,13 +153,6 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			}
 		}
 
-		// Create transaction number
-		trxNumber, err := uuid.NewV7()
-		if err != nil {
-			return fmt.Errorf("error generating transaction number: %v", err)
-		}
-
-		// Create charge request
 		chargeReq := &coreapi.ChargeReq{
 			PaymentType: coreapi.PaymentTypeQris,
 			TransactionDetails: midtrans.TransactionDetails{
@@ -166,16 +168,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			Items: &chargeItems,
 		}
 
-		fmt.Printf("%+v\n", chargeReq)
-		// Process the charge
 		response, err := s.midtransClient.ChargeTransaction(chargeReq)
-		// if err !=  {
-		// 	return fmt.Errorf("error processing charge: %v", err)
-		// }
-
-		// Check the response
-		fmt.Printf("%+v\n", response)
-		fmt.Println(response.StatusCode)
 		if response.StatusCode != "201" {
 			return fmt.Errorf("payment gateway returned non-200 status: %s", response.StatusCode)
 		}
@@ -205,7 +198,37 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		return err
 	})
 
-	return err
+	if err != nil {
+		fmt.Println(err)
+		kafkaMsg := dto.KafkaMessage{
+			EventType: "restore_product_stock",
+			Data:      productReqPayload,
+		}
+
+		fmt.Printf("%+v\n", kafkaMsg)
+		jsonMsg, err := json.Marshal(kafkaMsg)
+		if err != nil {
+			return fmt.Errorf("failed to marshal Kafka message: %w", err)
+		}
+
+		maxRetries := 3
+		for i := 0; i < maxRetries; i++ {
+			err = s.writeKafkaMessage(jsonMsg)
+			if err == nil {
+				break
+			}
+			log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+			time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (s *OrderServiceImpl) MidtransPaymentWebhook(ctx context.Context, req dto.PaymentNotification) (err error) {
@@ -222,6 +245,99 @@ func (s *OrderServiceImpl) MidtransPaymentWebhook(ctx context.Context, req dto.P
 		ID:            order.ID,
 		PaymentStatus: "success",
 	})
+
+	return
+}
+
+func (s *OrderServiceImpl) listenForProductStockUpdate(transactionNumber string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	success := make(chan struct{})
+	failed := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				msg, err := s.kafkaReader.ReadMessage(ctx)
+				if err != nil {
+					if err == context.DeadlineExceeded {
+						return
+					}
+					log.Println("Error reading Kafka message:", err)
+					continue
+				}
+
+				var receivedMsg dto.KafkaMessage
+				if err := json.Unmarshal(msg.Value, &receivedMsg); err != nil {
+					log.Println("Error unmarshalling Kafka message:", err)
+					continue
+				}
+
+				log.Printf("Received message: %+v\n", receivedMsg)
+
+				if receivedMsg.EventType == "stock_updated" {
+					var stockUpdateData dto.ProductServiceStockUpdate
+					dataBytes, err := json.Marshal(receivedMsg.Data)
+					if err != nil {
+						log.Println("Error marshalling user data:", err)
+						continue
+					}
+					if err := json.Unmarshal(dataBytes, &stockUpdateData); err != nil {
+						log.Println("Error unmarshalling user data:", err)
+						continue
+					}
+
+					if stockUpdateData.TransactionNumber == transactionNumber {
+						if stockUpdateData.Status {
+							close(success)
+							return
+						} else {
+							close(failed)
+							return
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	select {
+	case <-success:
+		return nil
+	case <-failed:
+		return errs.ErrConflict
+	case <-ctx.Done():
+		return fmt.Errorf("timeout waiting for stock update")
+	}
+}
+
+func (s *OrderServiceImpl) writeKafkaMessage(msg []byte) error {
+	_, err := s.kafkaProducer.WriteMessages(
+		kafka.Message{
+			Value: msg,
+		},
+	)
+	return err
+}
+
+func (s *OrderServiceImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) (response pkgdto.Pagination, err error) {
+	var orderResponse []dto.OrderResponse
+	datas, err := s.repository.GetOrders(ctx, filter)
+
+	for _, data := range datas {
+		orderResponse = append(orderResponse, dto.OrderResponse{
+			ID:                data.ID,
+			PaymentStatus:     data.PaymentStatus,
+			TransactionAmount: data.Amount,
+			PaymentMethodName: data.PaymentMethod.Name,
+		})
+	}
+
+	response.Records = orderResponse
 
 	return
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/alimikegami/point-of-sales/product-service/config"
+	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -23,13 +23,14 @@ func CreateKafkaReader(config *config.Config) *kafka.Reader {
 		MaxWait:          100 * time.Millisecond,
 		ReadLagInterval:  -1,
 		StartOffset:      kafka.LastOffset,
-		GroupID:          "product-service",
+		GroupID:          "order-service",
 		QueueCapacity:    1000,
 		ReadBatchTimeout: 10 * time.Millisecond,
 	})
 
 	return KafkaReader
 }
+
 func CreateKafkaProducer(config *config.Config) *kafka.Conn {
 	conn, err := kafka.DialLeader(context.Background(), "tcp", config.KafkaConfig.BrokerAddress, config.KafkaConfig.BrokerTopic, config.KafkaConfig.BrokerPartition)
 	if err != nil {

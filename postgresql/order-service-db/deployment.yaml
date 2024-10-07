@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service-db
+  template:
+    metadata:
+      labels:
+        app: order-service-db
+    spec:
+      containers:
+        - name: order-service-db
+          image: postgres:13
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: order_service
+            - name: POSTGRES_USER
+              value: myuser
+            - name: POSTGRES_PASSWORD
+              value: mypassword

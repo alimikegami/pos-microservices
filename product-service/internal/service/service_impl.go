@@ -107,6 +107,12 @@ func (s *ProductServiceImpl) DecreaseElasticSearchProductQuantity(ctx context.Co
 	return
 }
 
+func (s *ProductServiceImpl) AddElasticSearchProductQuantity(ctx context.Context, data []domain.Product) (err error) {
+	err = s.elasticSearchRepo.AddProductQuantities(ctx, data)
+
+	return
+}
+
 func (s *ProductServiceImpl) writeKafkaMessage(msg []byte) error {
 	_, err := s.kafkaProducer.WriteMessages(
 		kafka.Message{
@@ -131,7 +137,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 		}
 
 		fmt.Printf("Received message: %+v\n", receivedMsg)
-
+		fmt.Println("event received")
 		switch receivedMsg.EventType {
 		case "user_update":
 			var userData dto.User
@@ -263,10 +269,155 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			}
 
 			fmt.Println("product data deleted successfully")
+		case "order_created":
+			fmt.Println("here order_created")
+			var orderRequest dto.OrderRequest
+			dataBytes, err := json.Marshal(receivedMsg.Data)
+			if err != nil {
+				fmt.Println("Error marshalling user data:", err)
+				continue
+			}
+
+			if err := json.Unmarshal(dataBytes, &orderRequest); err != nil {
+				fmt.Println("Error unmarshalling user data:", err)
+				continue
+			}
+
+			stockUpdate := dto.StockUpdate{
+				TransactionNumber: orderRequest.TransactionNumber,
+				Status:            true,
+			}
+
+			err = s.UpdateProductsQuantity(context.Background(), orderRequest)
+			if err != nil {
+				stockUpdate.Status = false
+			}
+
+			kafkaMsg := dto.KafkaMessage{
+				EventType: "stock_updated",
+				Data:      stockUpdate,
+			}
+
+			jsonMsg, err := json.Marshal(kafkaMsg)
+			if err != nil {
+				log.Println("failed to marshal Kafka message: ", err)
+				continue
+			}
+
+			maxRetries := 3
+			for i := 0; i < maxRetries; i++ {
+				err = s.writeKafkaMessage(jsonMsg)
+				if err == nil {
+					break
+				}
+				log.Printf("Failed to write Kafka message (attempt %d/%d): %v\n", i+1, maxRetries, err)
+				time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+			}
+
+			if err != nil {
+				log.Printf("failed to write Kafka message after %d attempts: %v\n", maxRetries, err)
+				continue
+			}
+
+			fmt.Println("handled created order")
+		case "restore_product_stock_es":
+			var products []domain.Product
+			dataBytes, err := json.Marshal(receivedMsg.Data)
+			if err != nil {
+				fmt.Println("Error marshalling user data:", err)
+				continue
+			}
+
+			if err := json.Unmarshal(dataBytes, &products); err != nil {
+				fmt.Println("Error unmarshalling user data:", err)
+				continue
+			}
+			err = s.AddElasticSearchProductQuantity(context.Background(), products)
+			if err != nil {
+				fmt.Println("Error:", err)
+				continue
+			}
+
+			fmt.Println("product data updated successfully")
+		case "restore_product_stock":
+			var orderReq dto.OrderRequest
+			dataBytes, err := json.Marshal(receivedMsg.Data)
+			if err != nil {
+				fmt.Println("Error marshalling user data:", err)
+				continue
+			}
+
+			if err := json.Unmarshal(dataBytes, &orderReq); err != nil {
+				fmt.Println("Error unmarshalling user data:", err)
+				continue
+			}
+			err = s.RestoreProductStock(context.Background(), orderReq)
+			if err != nil {
+				fmt.Println("Error:", err)
+				continue
+			}
+
+			fmt.Println("product data updated successfully")
 		default:
 			fmt.Printf("Unknown event type: %s\n", receivedMsg.EventType)
 		}
 	}
+}
+
+func (s *ProductServiceImpl) RestoreProductStock(ctx context.Context, req dto.OrderRequest) (err error) {
+	err = s.mongoDBRepo.HandleTrx(ctx, func(repo repository.MongoDBProductRepository) error {
+		for _, orderItem := range req.OrderItems {
+			err = repo.AddProductQuantity(ctx, orderItem.ProductID, orderItem.Quantity)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	var products []domain.Product
+
+	for _, orderItem := range req.OrderItems {
+		objectID, err := primitive.ObjectIDFromHex(orderItem.ProductID)
+		if err != nil {
+			return err
+		}
+		products = append(products, domain.Product{
+			ID:       objectID,
+			Quantity: uint64(orderItem.Quantity),
+		})
+	}
+
+	kafkaMsg := dto.KafkaMessage{
+		EventType: "restore_product_stock_es",
+		Data:      products,
+	}
+
+	jsonMsg, err := json.Marshal(kafkaMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Kafka message: %w", err)
+	}
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		err = s.writeKafkaMessage(jsonMsg)
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
+	}
+
+	return
 }
 
 func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto.OrderRequest) (err error) {

@@ -16,5 +16,6 @@ type OrderItem struct {
 }
 
 type OrderRequest struct {
-	OrderItems []OrderItem `json:"order_items"`
+	TransactionNumber string      `json:"transaction_number"`
+	OrderItems        []OrderItem `json:"order_items"`
 }

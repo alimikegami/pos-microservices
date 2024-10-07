@@ -179,6 +179,43 @@ func (r *MongoDBProductRepositoryImpl) ReduceProductQuantity(ctx context.Context
 	return nil
 }
 
+func (r *MongoDBProductRepositoryImpl) AddProductQuantity(ctx context.Context, productID string, quantity int) error {
+	objectID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		return fmt.Errorf("invalid product ID: %v", err)
+	}
+
+	filter := bson.M{"_id": objectID}
+
+	update := bson.M{
+		"$inc": bson.M{"quantity": quantity},
+	}
+
+	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update product quantity: %v", err)
+	}
+
+	if result.ModifiedCount == 0 {
+		return fmt.Errorf("no product found with ID %s", productID)
+	}
+
+	var product struct {
+		Quantity int `bson:"quantity"`
+	}
+
+	err = r.db.Collection("products").FindOne(ctx, filter).Decode(&product)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve updated product: %v", err)
+	}
+
+	if product.Quantity < 0 {
+		return fmt.Errorf("product quantity cannot be negative")
+	}
+
+	return nil
+}
+
 func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id string) (err error) {
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
