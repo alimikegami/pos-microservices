@@ -26,7 +26,7 @@ func main() {
 	log.Logger = logger
 
 	config := config.CreateNewConfig()
-	db, err := mongodb.ConnectToMongoDB("mongodb://localhost:27017")
+	db, err := mongodb.ConnectToMongoDB(fmt.Sprintf("mongodb://%s:%s", config.MongoDBConfig.DBHost, config.MongoDBConfig.DBPort))
 	if err != nil {
 		panic(err)
 	}
@@ -59,8 +59,9 @@ func main() {
 		},
 	})
 
-	repo := repository.CreateNewRepository(db, elasticSearchClient)
-	svc := service.CreateProductService(repo, *config, kafkaReader, kafkaProducer)
+	mongoDBRepo := repository.CreateNewMongoDBRepository(db)
+	elasticSearchRepo := repository.CreateNewElasticSearchRepository(elasticSearchClient)
+	svc := service.CreateProductService(mongoDBRepo, elasticSearchRepo, *config, kafkaReader, kafkaProducer)
 	controller.CreateProductController(g, svc, IsLoggedIn)
 
 	g.GET("/ping", func(c echo.Context) error {
@@ -69,5 +70,5 @@ func main() {
 
 	go svc.ConsumeEvent()
 
-	e.Logger.Fatal(e.Start(":8081"))
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", config.ServicePort)))
 }

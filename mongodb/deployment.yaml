@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-service-db
+  template:
+    metadata:
+      labels:
+        app: product-service-db
+    spec:
+      containers:
+        - name: product-service-db
+          image: mongo
+          ports:
+            - containerPort: 27017

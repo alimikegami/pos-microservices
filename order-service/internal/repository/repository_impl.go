@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/alimikegami/point-of-sales/order-service/internal/domain"
+	pkgdto "github.com/alimikegami/point-of-sales/order-service/pkg/dto"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/errs"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -61,6 +62,17 @@ func (r *OrderRepositoryImpl) UpdateOrderPaymentStatus(ctx context.Context, data
 	}
 
 	return nil
+}
+
+func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) (data []domain.Order, err error) {
+	err = r.db.WithContext(ctx).Preload("PaymentMethod").Find(&data).Error
+
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetOrders").Msg("")
+		return data, errs.ErrInternalServer
+	}
+
+	return
 }
 
 func (r *OrderRepositoryImpl) HandleTrx(ctx context.Context, fn func(repo OrderRepository) error) error {

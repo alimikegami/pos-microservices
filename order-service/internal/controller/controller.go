@@ -1,10 +1,9 @@
 package controller
 
 import (
-	"fmt"
-
 	"github.com/alimikegami/point-of-sales/order-service/internal/dto"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
+	pkgdto "github.com/alimikegami/point-of-sales/order-service/pkg/dto"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/response"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
@@ -21,7 +20,7 @@ func CreateOrderController(e *echo.Group, service service.OrderService, isLogged
 
 	e.POST("/orders", c.AddOrder)
 	e.POST("/orders/payments/notifications", c.MidtransPaymentWebhook)
-
+	e.GET("/orders", c.GetOrders)
 }
 
 func (c *Controller) AddOrder(e echo.Context) error {
@@ -43,7 +42,6 @@ func (c *Controller) AddOrder(e echo.Context) error {
 }
 
 func (c *Controller) MidtransPaymentWebhook(e echo.Context) error {
-	fmt.Println("here")
 	payload := dto.PaymentNotification{}
 	err := e.Bind(&payload)
 	if err != nil {
@@ -57,4 +55,20 @@ func (c *Controller) MidtransPaymentWebhook(e echo.Context) error {
 	}
 
 	return response.WriteSuccessResponse(e, "", nil)
+}
+
+func (c *Controller) GetOrders(e echo.Context) error {
+	filter := pkgdto.Filter{}
+	err := e.Bind(&filter)
+	if err != nil {
+		log.Error().Err(err).Str("component", "AddProduct").Msg("")
+	}
+
+	responsePayload, err := c.service.GetOrders(e.Request().Context(), filter)
+
+	if err != nil {
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	return response.WriteSuccessResponse(e, "successfuly retrieved orders record", responsePayload)
 }

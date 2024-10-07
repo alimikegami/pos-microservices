@@ -2,14 +2,14 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/alimikegami/e-commerce/user-service/internal/domain"
 	pkgdto "github.com/alimikegami/e-commerce/user-service/pkg/dto"
 	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
+	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
-
-	"gorm.io/gorm"
 )
 
 type UserRepository interface {
@@ -22,38 +22,46 @@ type UserRepository interface {
 }
 
 type UserRepositoryImpl struct {
-	db *gorm.DB
+	db *sqlx.DB
 }
 
-func CreateNewRepository(db *gorm.DB) UserRepository {
+func CreateNewRepository(db *sqlx.DB) UserRepository {
 	return &UserRepositoryImpl{db: db}
 }
 
-func (r *UserRepositoryImpl) AddUser(ctx context.Context, data domain.User) (id int64, err error) {
-	tx := r.db.Begin()
-	timestamp := time.Now().UnixMilli()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
+func (r *UserRepositoryImpl) GetUserByEmail(ctx context.Context, email string) (res domain.User, err error) {
+	row := r.db.QueryRowxContext(ctx, "SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL", email)
+	err = row.StructScan(&res)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetUserByEmail").Msg("")
+		if err == sql.ErrNoRows {
+			return res, nil
 		}
-	}()
-
-	if err := tx.Error; err != nil {
-		return 0, errs.ErrInternalServer
+		return res, errs.ErrInternalServer
 	}
 
+	return
+}
+
+func (r *UserRepositoryImpl) AddUser(ctx context.Context, data domain.User) (id int64, err error) {
+	tx := r.db.MustBegin()
+	timestamp := time.Now().UnixMilli()
 	data.CreatedAt = timestamp
 	data.UpdatedAt = timestamp
 
-	err = tx.WithContext(ctx).Create(&data).Error
-
+	nstmt, err := tx.PrepareNamedContext(ctx, "INSERT INTO users(name, email, external_id, hashed_password, role_id, created_at, updated_at) VALUES (:name, :email, :external_id, :hashed_password, :role_id, :created_at, :updated_at) returning id")
 	if err != nil {
 		log.Error().Err(err).Str("component", "AddUser").Msg("")
-		return 0, errs.ErrInternalServer
+		return
 	}
 
-	err = tx.WithContext(ctx).Create(&domain.UserHistory{
+	err = nstmt.GetContext(ctx, &data.ID, data)
+	if err != nil {
+		log.Error().Err(err).Str("component", "AddUser").Msg("")
+		return
+	}
+
+	userHist := domain.UserHistory{
 		Name:           data.Name,
 		Email:          data.Email,
 		HashedPassword: data.HashedPassword,
@@ -62,131 +70,99 @@ func (r *UserRepositoryImpl) AddUser(ctx context.Context, data domain.User) (id 
 		RoleID:         data.RoleID,
 		CreatedAt:      timestamp,
 		UpdatedAt:      timestamp,
-	}).Error
-
-	if err != nil {
-		log.Error().Err(err).Str("component", "AddUser").Msg("")
-		return 0, errs.ErrInternalServer
 	}
 
-	err = tx.Commit().Error
+	_, err = tx.NamedExecContext(ctx, "INSERT INTO user_histories(name, email, external_id, hashed_password, role_id, user_id, created_at, updated_at) VALUES (:name, :email, :external_id, :hashed_password, :role_id, :user_id, :created_at, :updated_at)", userHist)
 	if err != nil {
 		log.Error().Err(err).Str("component", "AddUser").Msg("")
-		return 0, errs.ErrInternalServer
+		return
 	}
 
-	return data.ID, nil
+	err = tx.Commit()
+
+	return
 }
 
-func (r *UserRepositoryImpl) GetUserByEmail(ctx context.Context, email string) (res domain.User, err error) {
-	err = r.db.WithContext(ctx).Where("deleted_at IS NULL").Where("email = ?", email).First(&res).Error
-
+func (r *UserRepositoryImpl) GetUserByID(ctx context.Context, id int64) (data domain.User, err error) {
+	row := r.db.QueryRowxContext(ctx, "SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL", id)
+	err = row.StructScan(&data)
 	if err != nil {
 		log.Error().Err(err).Str("component", "GetUserByEmail").Msg("")
-		if err == gorm.ErrRecordNotFound {
-			return res, nil
+		if err == sql.ErrNoRows {
+			return data, nil
 		}
-		return
+		return data, errs.ErrInternalServer
 	}
 
 	return
 }
 
 func (r *UserRepositoryImpl) UpdateUser(ctx context.Context, data domain.User) (err error) {
-	tx := r.db.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	if err := tx.Error; err != nil {
-		return err
-	}
-
+	tx := r.db.MustBegin()
 	timestamp := time.Now().UnixMilli()
-
+	data.CreatedAt = timestamp
 	data.UpdatedAt = timestamp
-	err = r.db.WithContext(ctx).Model(&data).Updates(data).Error
+
+	_, err = tx.NamedExecContext(ctx, "UPDATE users SET name=:name, hashed_password=:hashed_password WHERE id=:id AND deleted_at IS NULL", data)
 	if err != nil {
 		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
-		return errs.ErrInternalServer
-	}
-
-	err = r.db.WithContext(ctx).Model(&domain.UserHistory{}).Where("user_id = ?", data.ID).Where("deleted_at IS NULL").UpdateColumn("deleted_at", timestamp).Error
-	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
-		return errs.ErrInternalServer
-	}
-
-	err = r.db.WithContext(ctx).Create(&domain.UserHistory{
-		Name:       data.Name,
-		Email:      data.Email,
-		UserID:     data.ID,
-		ExternalID: data.ExternalID,
-		CreatedAt:  timestamp,
-		UpdatedAt:  timestamp,
-		RoleID:     data.RoleID,
-	}).Error
-
-	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
-		return errs.ErrInternalServer
-	}
-
-	err = tx.Commit().Error
-	return
-}
-
-func (r *UserRepositoryImpl) GetUserByID(ctx context.Context, id int64) (data domain.User, err error) {
-	err = r.db.WithContext(ctx).Where("deleted_at IS NULL").First(&data, id).Error
-
-	if err != nil {
-		log.Error().Err(err).Str("component", "GetUserByID").Msg("")
-		if err == gorm.ErrRecordNotFound {
-			return data, nil
-		}
 		return
 	}
+
+	userHist := domain.UserHistory{
+		Name:           data.Name,
+		Email:          data.Email,
+		HashedPassword: data.HashedPassword,
+		UserID:         data.ID,
+		ExternalID:     data.ExternalID,
+		RoleID:         data.RoleID,
+		CreatedAt:      timestamp,
+		UpdatedAt:      timestamp,
+	}
+
+	_, err = tx.NamedExecContext(ctx, "INSERT INTO user_histories(name, email, external_id, hashed_password, role_id, user_id, created_at, updated_at) VALUES (:name, :email, :external_id, :hashed_password, :role_id, :user_id, :created_at, :updated_at)", userHist)
+	if err != nil {
+		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
+		return
+	}
+
+	err = tx.Commit()
 
 	return
 }
 
 func (r *UserRepositoryImpl) GetUsers(ctx context.Context, filter pkgdto.Filter) (data []domain.User, err error) {
-	query := r.db.WithContext(ctx).Where("deleted_at IS NULL").Preload("Role")
+	query := "SELECT * FROM users WHERE deleted_at IS NULL"
+
+	args := make(map[string]interface{})
 
 	if filter.Limit != 0 && filter.Page != 0 {
-		query = query.Limit(filter.Limit).Offset((filter.Page - 1) * filter.Limit)
+		offset := (filter.Page - 1) * filter.Limit
+		query += " LIMIT :limit OFFSET :offset"
+		args["limit"] = filter.Limit
+		args["offset"] = offset
 	}
 
-	if filter.Q != "" {
-		query = query.Where("name LIKE ?", "%"+filter.Q+"%")
-	}
-
-	err = query.Find(&data).Error
+	nstmt, err := r.db.PrepareNamedContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Str("component", "GetUsers").Msg("")
-		if err == gorm.ErrRecordNotFound {
-			return data, nil
-		}
-
-		return
+		return nil, err
 	}
 
-	return
+	err = nstmt.SelectContext(ctx, &data, args)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetUsers").Msg("")
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func (r *UserRepositoryImpl) CountUsers(ctx context.Context, filter pkgdto.Filter) (count int64, err error) {
-	query := r.db.WithContext(ctx).Model(&domain.User{}).Where("deleted_at IS NULL").Select("COUNT(*)")
-	if filter.Q != "" {
-		query = query.Where("name LIKE ?", "%"+filter.Q+"%")
-	}
-
-	err = query.Scan(&count).Error
+	err = r.db.GetContext(ctx, &count, "SELECT COUNT(id) FROM users WHERE deleted_at IS NULL")
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUsers").Msg("")
-		return
+		log.Error().Err(err).Str("component", "CountUsers").Msg("")
+		return 0, err
 	}
 
 	return

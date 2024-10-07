@@ -22,6 +22,9 @@ func CreateProductController(e *echo.Group, service service.ProductService, isLo
 	e.GET("/products", c.GetProducts)
 	e.POST("/products/prices", c.GetProductsPrice)
 	e.PUT("/products/quantity", c.UpdateProductsQuantity)
+	e.DELETE("/products/:id", c.DeleteProduct)
+	e.PUT("/products/:id", c.UpdateProduct)
+	e.PUT("/products/:id/quantity", c.UpdateProductQuantity)
 }
 
 func (c *Controller) AddProduct(e echo.Context) error {
@@ -85,6 +88,50 @@ func (c *Controller) UpdateProductsQuantity(e echo.Context) error {
 	}
 
 	err = c.service.UpdateProductsQuantity(e.Request().Context(), payload)
+	if err != nil {
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	return response.WriteSuccessResponse(e, "", nil)
+}
+
+func (c *Controller) DeleteProduct(e echo.Context) error {
+	id := e.Param("id")
+	err := c.service.DeleteProduct(e.Request().Context(), id)
+	if err != nil {
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	return response.WriteSuccessResponse(e, "", nil)
+}
+
+func (c *Controller) UpdateProduct(e echo.Context) error {
+	id := e.Param("id")
+	payload := dto.ProductRequest{}
+	err := e.Bind(&payload)
+	if err != nil {
+		log.Error().Err(err).Str("component", "UpdateProduct").Msg("")
+	}
+
+	payload.ID = id
+	err = c.service.UpdateProduct(e.Request().Context(), payload)
+	if err != nil {
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	return response.WriteSuccessResponse(e, "", nil)
+}
+
+func (c *Controller) UpdateProductQuantity(e echo.Context) error {
+	id := e.Param("id")
+	payload := dto.ProductQuantityRequest{}
+	err := e.Bind(&payload)
+	if err != nil {
+		log.Error().Err(err).Str("component", "UpdateProduct").Msg("")
+	}
+
+	payload.ProductID = id
+	err = c.service.UpdateProductQuantity(e.Request().Context(), payload)
 	if err != nil {
 		return response.WriteErrorResponse(e, err, nil)
 	}

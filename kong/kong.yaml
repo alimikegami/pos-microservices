@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      containers:
+      - name: kong
+        image: kong:3.3
+        env:
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_DECLARATIVE_CONFIG
+          value: /kong/kong.yaml
+        - name: KONG_PROXY_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_PROXY_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_LOG_LEVEL
+          value: "debug"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+        ports:
+        - containerPort: 8000
+        - containerPort: 8443
+        volumeMounts:
+        - name: kong-config
+          mountPath: /kong
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-proxy
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: kong
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+data:
+  kong.yaml: |
+    _format_version: "2.1"
+    _transform: true
+
+    services:
+      - name: user-service
+        url: http://user-service-service/api/v1/users
+        routes:
+          - name: user-service-route
+            paths:
+              - /api/v1/users
+            strip_path: true
+      - name: user-service
+        url: http://user-service-service/api/v1/users
+        routes:
+          - name: user-service-route
+            paths:
+              - /api/v1/users
+            strip_path: true
+      - name: product-service
+        url: http://product-service-service/api/v1/products
+        routes:
+          - name: product-service-route
+            paths:
+              - /api/v1/products
+            strip_path: true
+      - name: order-service
+        url: http://order-service-service/api/v1/orders
+        routes:
+          - name: order-service-route
+            paths:
+              - /api/v1/orders
+            strip_path: true

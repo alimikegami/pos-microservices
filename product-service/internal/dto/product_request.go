@@ -1,6 +1,7 @@
 package dto
 
 type ProductRequest struct {
+	ID          string
 	Name        string `json:"name"`
 	Quantity    uint64 `json:"quantity"`
 	Description string `json:"description"`
@@ -15,5 +16,6 @@ type OrderItem struct {
 }
 
 type OrderRequest struct {
-	OrderItems []OrderItem `json:"order_items"`
+	TransactionNumber string      `json:"transaction_number"`
+	OrderItems        []OrderItem `json:"order_items"`
 }
