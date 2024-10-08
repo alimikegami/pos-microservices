@@ -30,7 +30,7 @@ func main() {
 	kafkaProducer := kafka.CreateKafkaProducer(config)
 	kafkaReader := kafka.CreateKafkaReader(config)
 
-	db, err := postgres.GetDBInstance(config)
+	db, err := postgres.GetDBInstance(config.PostgreSQLConfig.DBUsername, config.PostgreSQLConfig.DBPassword, config.PostgreSQLConfig.DBHost, config.PostgreSQLConfig.DBPort, config.PostgreSQLConfig.DBName)
 	if err != nil {
 		panic(err)
 	}
@@ -60,5 +60,5 @@ func main() {
 	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer)
 	controller.CreateOrderController(g, orderSvc, IsLoggedIn)
 
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.Start(":8083"))
 }

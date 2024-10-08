@@ -8,7 +8,7 @@ import (
 )
 
 type OrderRepository interface {
-	HandleTrx(ctx context.Context, fn func(repo OrderRepository) error) error
+	HandleTrx(ctx context.Context, fn func(ctx context.Context, repo OrderRepository) error) error
 
 	AddOrder(ctx context.Context, data domain.Order) (id int64, err error)
 	AddOrderDetails(ctx context.Context, data []domain.OrderDetail) (err error)

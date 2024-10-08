@@ -52,7 +52,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		})
 	}
 
-	err = s.repository.HandleTrx(ctx, func(repo repository.OrderRepository) error {
+	err = s.repository.HandleTrx(ctx, func(ctx context.Context, repo repository.OrderRepository) error {
 		var orderDetails []domain.OrderDetail
 
 		productIDs := make([]string, len(req.OrderItems))
@@ -134,6 +134,8 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 						Quantity:    int64(item.Quantity),
 						Amount:      p.Price,
 						ProductName: p.Name,
+						CreatedAt:   time.Now().Unix(),
+						UpdatedAt:   time.Now().Unix(),
 					})
 					break
 				}
@@ -184,6 +186,8 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			PaymentStatus:     "pending",
 			TransactionNumber: trxNumber.String(),
 			ExpiredAt:         expiredAt,
+			CreatedAt:         time.Now().Unix(),
+			UpdatedAt:         time.Now().Unix(),
 		})
 		if err != nil {
 			return err
