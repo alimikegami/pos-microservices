@@ -2,10 +2,8 @@ package repository
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/alimikegami/point-of-sales/product-service/internal/domain"
-	"github.com/alimikegami/point-of-sales/product-service/internal/dto"
 	pkgdto "github.com/alimikegami/point-of-sales/product-service/pkg/dto"
 	"github.com/alimikegami/point-of-sales/product-service/pkg/errs"
 	"github.com/rs/zerolog/log"
@@ -24,213 +22,89 @@ func CreateNewMongoDBRepository(db *mongo.Database) MongoDBProductRepository {
 }
 
 func (r *MongoDBProductRepositoryImpl) AddProduct(ctx context.Context, data domain.Product) (id primitive.ObjectID, err error) {
-	productResult, err := r.db.Collection("products").InsertOne(ctx, data)
+	result, err := r.db.Collection("products").InsertOne(ctx, data)
 	if err != nil {
 		log.Error().Err(err).Str("component", "AddProduct").Msg("")
 		return
 	}
 
-	id = productResult.InsertedID.(primitive.ObjectID)
-	return
+	return result.InsertedID.(primitive.ObjectID), err
 }
 
 func (r *MongoDBProductRepositoryImpl) GetProducts(ctx context.Context, param pkgdto.Filter) (data []domain.Product, err error) {
-	findOptions := options.Find()
-	findOptions.SetLimit(int64(param.Limit))
-	findOptions.SetSkip(int64((param.Page - 1) * param.Limit))
+	var opts *options.FindOptions
 
-	filter := bson.D{}
+	if param.Limit != 0 && param.Page != 0 {
+		opts = options.Find().SetSkip((int64(param.Page) - 1) * int64(param.Limit))
+	}
 
-	cursor, err := r.db.Collection("products").Find(ctx, filter, findOptions)
+	cursor, err := r.db.Collection("products").Find(ctx, nil, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve documents: %v", err)
-	}
-
-	defer cursor.Close(ctx)
-
-	if err = cursor.All(ctx, &data); err != nil {
-		return nil, fmt.Errorf("failed to decode documents: %v", err)
-	}
-
-	return data, nil
-}
-
-func (r *MongoDBProductRepositoryImpl) GetProductByIDs(ctx context.Context, ids []string) (data []domain.Product, err error) {
-	objectIDs := make([]primitive.ObjectID, len(ids))
-	for i, id := range ids {
-		objectID, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			return nil, fmt.Errorf("invalid ID format: %v", err)
-		}
-		objectIDs[i] = objectID
-	}
-
-	filter := bson.M{"_id": bson.M{"$in": objectIDs}}
-
-	cursor, err := r.db.Collection("products").Find(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve documents: %v", err)
-	}
-	defer cursor.Close(ctx)
-
-	if err = cursor.All(ctx, &data); err != nil {
-		return nil, fmt.Errorf("failed to decode documents: %v", err)
-	}
-
-	return data, nil
-}
-
-func (r *MongoDBProductRepositoryImpl) UpdateSellerDetails(ctx context.Context, data dto.User) (err error) {
-	filter := bson.M{"user_id": data.ExternalID}
-
-	update := bson.M{
-		"$set": bson.M{"user_name": data.Name},
-	}
-
-	_, err = r.db.Collection("products").UpdateOne(ctx, filter, update)
-	if err != nil {
-		fmt.Println(err)
+		log.Error().Err(err).Str("component", "GetProducts").Msg("")
 		return
 	}
 
-	return
+	if err = cursor.All(ctx, &data); err != nil {
+		log.Error().Err(err).Str("component", "GetProducts").Msg("")
+		return
+	}
+
+	return data, nil
 }
 
 func (r *MongoDBProductRepositoryImpl) GetProductByID(ctx context.Context, id string) (product domain.Product, err error) {
-	objectID, err := primitive.ObjectIDFromHex(id)
+	productID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return product, fmt.Errorf("invalid ID format: %v", err)
+		log.Error().Err(err).Str("component", "GetProductByID").Msg("")
+		return
 	}
 
-	filter := bson.M{"_id": objectID}
+	filter := bson.D{{Key: "_id", Value: productID}}
+	opts := options.FindOne()
 
-	err = r.db.Collection("products").FindOne(ctx, filter).Decode(&product)
+	err = r.db.Collection("products").FindOne(ctx, filter, opts).Decode(&product)
 	if err != nil {
+		log.Error().Err(err).Str("component", "GetProductByID").Msg("")
 		if err == mongo.ErrNoDocuments {
-			return product, fmt.Errorf("product not found")
+			return product, errs.ErrNotFound
 		}
-		return product, fmt.Errorf("failed to retrieve product: %v", err)
-	}
 
+		return product, err
+	}
 	return product, nil
 }
 
-func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(repo MongoDBProductRepository) error) error {
+func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ctx mongo.SessionContext, repo MongoDBProductRepository) error) error {
 	session, err := r.db.Client().StartSession()
 	if err != nil {
-		return fmt.Errorf("failed to start session: %v", err)
+		panic(err)
 	}
+
+	// Defers ending the session after the transaction is committed or ended
 	defer session.EndSession(ctx)
 
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		newRepo := &MongoDBProductRepositoryImpl{
-			db: r.db,
-		}
+	_, err = session.WithTransaction(ctx, func(ctx mongo.SessionContext) (interface{}, error) {
+		err := fn(ctx, r)
 
-		err := fn(newRepo)
-		if err != nil {
-			return nil, err
-		}
-
-		return nil, nil
+		return nil, err
 	})
 
-	if err != nil {
-		return fmt.Errorf("transaction failed: %v", err)
-	}
-
-	return nil
-}
-
-func (r *MongoDBProductRepositoryImpl) ReduceProductQuantity(ctx context.Context, productID string, quantity int) error {
-	objectID, err := primitive.ObjectIDFromHex(productID)
-	if err != nil {
-		return fmt.Errorf("invalid product ID: %v", err)
-	}
-
-	filter := bson.M{"_id": objectID}
-
-	update := bson.M{
-		"$inc": bson.M{"quantity": -quantity},
-	}
-
-	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf("failed to update product quantity: %v", err)
-	}
-
-	if result.ModifiedCount == 0 {
-		return fmt.Errorf("no product found with ID %s", productID)
-	}
-
-	var product struct {
-		Quantity int `bson:"quantity"`
-	}
-
-	err = r.db.Collection("products").FindOne(ctx, filter).Decode(&product)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve updated product: %v", err)
-	}
-
-	if product.Quantity < 0 {
-		return fmt.Errorf("product quantity cannot be negative")
-	}
-
-	return nil
-}
-
-func (r *MongoDBProductRepositoryImpl) AddProductQuantity(ctx context.Context, productID string, quantity int) error {
-	objectID, err := primitive.ObjectIDFromHex(productID)
-	if err != nil {
-		return fmt.Errorf("invalid product ID: %v", err)
-	}
-
-	filter := bson.M{"_id": objectID}
-
-	update := bson.M{
-		"$inc": bson.M{"quantity": quantity},
-	}
-
-	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf("failed to update product quantity: %v", err)
-	}
-
-	if result.ModifiedCount == 0 {
-		return fmt.Errorf("no product found with ID %s", productID)
-	}
-
-	var product struct {
-		Quantity int `bson:"quantity"`
-	}
-
-	err = r.db.Collection("products").FindOne(ctx, filter).Decode(&product)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve updated product: %v", err)
-	}
-
-	if product.Quantity < 0 {
-		return fmt.Errorf("product quantity cannot be negative")
-	}
-
-	return nil
+	return err
 }
 
 func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id string) (err error) {
-	objectID, err := primitive.ObjectIDFromHex(id)
+	productID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return fmt.Errorf("invalid product ID: %v", err)
+		log.Error().Err(err).Str("component", "DeleteProduct").Msg("")
+		return
 	}
 
-	filter := bson.M{"_id": objectID}
-	opts := options.Delete().SetHint(bson.D{{Key: "_id", Value: 1}})
-	result, err := r.db.Collection("products").DeleteOne(context.TODO(), filter, opts)
-	if err != nil {
-		return fmt.Errorf("failed to delete product: %v", err)
-	}
+	filter := bson.D{{Key: "_id", Value: productID}}
 
-	if result.DeletedCount == 0 {
-		return errs.ErrNotFound
+	_, err = r.db.Collection("products").DeleteOne(ctx, filter)
+	if err != nil {
+		log.Error().Err(err).Str("component", "DeleteProduct").Msg("")
+		return
 	}
 
 	return
@@ -238,25 +112,56 @@ func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id str
 
 func (r *MongoDBProductRepositoryImpl) UpdateProduct(ctx context.Context, data domain.Product) (err error) {
 	filter := bson.D{{Key: "_id", Value: data.ID}}
-	update := bson.D{{Key: "$set", Value: bson.D{{Key: "name", Value: data.Name},
-		{Key: "description", Value: data.Description},
-		{Key: "price", Value: data.Price}}}}
 
-	_, err = r.db.Collection("products").UpdateOne(ctx, filter, update)
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "name", Value: data.Name}, {Key: "description", Value: data.Description}}}}
+
+	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
+		log.Error().Err(err).Str("component", "UpdateProduct").Msg("Failed to update product")
 		return
+	}
+
+	if result.MatchedCount == 0 {
+		log.Error().Err(err).Str("component", "UpdateProduct").Msg("Failed to update product")
+		return errs.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *MongoDBProductRepositoryImpl) UpdateProductQuantity(ctx context.Context, data domain.Product) (err error) {
+	filter := bson.D{{Key: "_id", Value: data.ID}}
+
+	update := bson.D{{Key: "$inc", Value: bson.D{{Key: "quantity", Value: data.Quantity}}}}
+
+	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		return errs.ErrNotFound
 	}
 
 	return
 }
 
-func (r *MongoDBProductRepositoryImpl) UpdateProductQuantity(ctx context.Context, data domain.Product) (err error) {
+func (r *MongoDBProductRepositoryImpl) SetProductQuantity(ctx context.Context, data domain.Product) (err error) {
 	filter := bson.D{{Key: "_id", Value: data.ID}}
+
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "quantity", Value: data.Quantity}}}}
 
-	_, err = r.db.Collection("products").UpdateOne(ctx, filter, update)
+	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
+		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
 		return
+	}
+
+	if result.MatchedCount == 0 {
+		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		return errs.ErrNotFound
 	}
 
 	return

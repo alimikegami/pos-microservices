@@ -15,6 +15,7 @@ import (
 	"github.com/alimikegami/point-of-sales/product-service/pkg/errs"
 	"github.com/segmentio/kafka-go"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ProductServiceImpl struct {
@@ -86,12 +87,8 @@ func (s *ProductServiceImpl) GetProducts(ctx context.Context, filter pkgdto.Filt
 
 	responsePayload.Records = data
 	responsePayload.Metadata.TotalCount = uint64(total)
-	return
-}
-
-func (s *ProductServiceImpl) UpdateSellerDetails(ctx context.Context, data dto.User) (err error) {
-	err = s.mongoDBRepo.UpdateSellerDetails(context.Background(), data)
-
+	responsePayload.Metadata.Limit = filter.Limit
+	responsePayload.Metadata.Page = uint64(filter.Page)
 	return
 }
 
@@ -137,30 +134,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 		}
 
 		fmt.Printf("Received message: %+v\n", receivedMsg)
-		fmt.Println("event received")
 		switch receivedMsg.EventType {
-		case "user_update":
-			var userData dto.User
-			dataBytes, err := json.Marshal(receivedMsg.Data)
-			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
-				continue
-			}
-			if err := json.Unmarshal(dataBytes, &userData); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
-				continue
-			}
-
-			err = s.UpdateSellerDetails(context.Background(), userData)
-			if err != nil {
-				fmt.Println("Error:", err)
-				continue
-			}
-
-			fmt.Println("User details updated successfully")
-		case "user_delete":
-			// Handle user delete event if needed
-			fmt.Println("User delete event received - implement handling if required")
 		case "add_product":
 			var productData dto.ProductResponse
 			dataBytes, err := json.Marshal(receivedMsg.Data)
@@ -199,25 +173,6 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			}
 
 			fmt.Println("product data updated successfully")
-		case "update_product_quantity":
-			var product domain.Product
-			dataBytes, err := json.Marshal(receivedMsg.Data)
-			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
-				continue
-			}
-
-			if err := json.Unmarshal(dataBytes, &product); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
-				continue
-			}
-			err = s.elasticSearchRepo.UpdateProductQuantities(context.Background(), product)
-			if err != nil {
-				fmt.Println("Error:", err)
-				continue
-			}
-
-			fmt.Println("product data updated successfully")
 		case "delete_product":
 			var product dto.Product
 			dataBytes, err := json.Marshal(receivedMsg.Data)
@@ -231,7 +186,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 				continue
 			}
 
-			err = s.elasticSearchRepo.DeleteProduct(context.Background(), product.ID)
+			err = s.DeleteElasticSearchProduct(context.Background(), product.ID)
 			if err != nil {
 				fmt.Println("Error:", err)
 				continue
@@ -251,26 +206,14 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 				continue
 			}
 
-			objectID, err := primitive.ObjectIDFromHex(product.ID)
-			if err != nil {
-				fmt.Printf("invalid product ID: %v\n", err)
-				continue
-			}
-
-			err = s.elasticSearchRepo.UpdateProduct(context.Background(), domain.Product{
-				ID:          objectID,
-				Name:        product.Name,
-				Description: product.Description,
-				Price:       product.Price,
-			})
+			err = s.UpdateElasticSearchProduct(context.Background(), product)
 			if err != nil {
 				fmt.Println("Error:", err)
 				continue
 			}
 
-			fmt.Println("product data deleted successfully")
+			fmt.Println("product data updated successfully")
 		case "order_created":
-			fmt.Println("here order_created")
 			var orderRequest dto.OrderRequest
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
@@ -365,9 +308,17 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 }
 
 func (s *ProductServiceImpl) RestoreProductStock(ctx context.Context, req dto.OrderRequest) (err error) {
-	err = s.mongoDBRepo.HandleTrx(ctx, func(repo repository.MongoDBProductRepository) error {
+	err = s.mongoDBRepo.HandleTrx(ctx, func(ctx mongo.SessionContext, repo repository.MongoDBProductRepository) error {
 		for _, orderItem := range req.OrderItems {
-			err = repo.AddProductQuantity(ctx, orderItem.ProductID, orderItem.Quantity)
+			productID, err := primitive.ObjectIDFromHex(orderItem.ProductID)
+			if err != nil {
+				return err
+			}
+
+			err = repo.UpdateProductQuantity(ctx, domain.Product{
+				ID:       productID,
+				Quantity: uint64(orderItem.Quantity),
+			})
 			if err != nil {
 				return err
 			}
@@ -421,25 +372,29 @@ func (s *ProductServiceImpl) RestoreProductStock(ctx context.Context, req dto.Or
 }
 
 func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto.OrderRequest) (err error) {
-	err = s.mongoDBRepo.HandleTrx(ctx, func(repo repository.MongoDBProductRepository) error {
-		for _, orderItem := range req.OrderItems {
-			product, err := repo.GetProductByID(ctx, orderItem.ProductID)
-			if err != nil {
-				return err
-			}
-
-			if product.Quantity < uint64(orderItem.Quantity) {
-				return errs.ErrConflict
-			}
-
-			err = repo.ReduceProductQuantity(ctx, orderItem.ProductID, orderItem.Quantity)
-			if err != nil {
-				return err
-			}
+	// err = s.mongoDBRepo.HandleTrx(ctx, func(ctx mongo.SessionContext, repo repository.MongoDBProductRepository) error {
+	for idx, orderItem := range req.OrderItems {
+		fmt.Println(idx)
+		product, err := s.mongoDBRepo.GetProductByID(ctx, orderItem.ProductID)
+		if err != nil {
+			return err
 		}
 
-		return nil
-	})
+		if product.Quantity < uint64(orderItem.Quantity) {
+			return errs.ErrConflict
+		}
+
+		err = s.mongoDBRepo.SetProductQuantity(ctx, domain.Product{
+			ID:       product.ID,
+			Quantity: product.Quantity - uint64(orderItem.Quantity),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// 	return nil
+	// })
 
 	if err != nil {
 		return err
@@ -532,6 +487,7 @@ func (s *ProductServiceImpl) UpdateProduct(ctx context.Context, data dto.Product
 		Name:        data.Name,
 		Description: data.Description,
 		Quantity:    data.Quantity,
+		Price:       data.Price,
 	}
 
 	err = s.mongoDBRepo.UpdateProduct(ctx, updatedData)
@@ -545,6 +501,7 @@ func (s *ProductServiceImpl) UpdateProduct(ctx context.Context, data dto.Product
 			ID:          data.ID,
 			Name:        data.Name,
 			Description: data.Description,
+			Quantity:    data.Quantity,
 			Price:       data.Price,
 		},
 	}
@@ -571,6 +528,23 @@ func (s *ProductServiceImpl) UpdateProduct(ctx context.Context, data dto.Product
 	return
 }
 
+func (s *ProductServiceImpl) UpdateElasticSearchProduct(ctx context.Context, data dto.Product) (err error) {
+	objectID, err := primitive.ObjectIDFromHex(data.ID)
+	if err != nil {
+		return
+	}
+
+	err = s.elasticSearchRepo.UpdateProduct(ctx, domain.Product{
+		ID:          objectID,
+		Name:        data.Name,
+		Description: data.Description,
+		Quantity:    data.Quantity,
+		Price:       data.Price,
+	})
+
+	return
+}
+
 func (s *ProductServiceImpl) UpdateProductQuantity(ctx context.Context, req dto.ProductQuantityRequest) (err error) {
 	productData, err := s.mongoDBRepo.GetProductByID(ctx, req.ProductID)
 	if err != nil {
@@ -591,7 +565,7 @@ func (s *ProductServiceImpl) UpdateProductQuantity(ctx context.Context, req dto.
 	}
 
 	kafkaMsg := dto.KafkaMessage{
-		EventType: "update_product_quantity",
+		EventType: "update_product",
 		Data:      productData,
 	}
 
@@ -613,6 +587,12 @@ func (s *ProductServiceImpl) UpdateProductQuantity(ctx context.Context, req dto.
 	if err != nil {
 		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
 	}
+
+	return
+}
+
+func (s *ProductServiceImpl) DeleteElasticSearchProduct(ctx context.Context, id string) (err error) {
+	err = s.elasticSearchRepo.DeleteProduct(ctx, id)
 
 	return
 }

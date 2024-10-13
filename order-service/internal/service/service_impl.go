@@ -68,6 +68,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			return fmt.Errorf("error marshalling price info request: %v", err)
 		}
 
+		// TODO: config env for product service endpoint
 		priceInfoHttpReq := httpclient.HttpRequest{
 			URL:    "http://localhost:8081/api/v1/products/prices",
 			Method: "POST",

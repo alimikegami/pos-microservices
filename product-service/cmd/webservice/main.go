@@ -8,7 +8,6 @@ import (
 
 	"github.com/alimikegami/point-of-sales/product-service/config"
 	"github.com/alimikegami/point-of-sales/product-service/internal/controller"
-	"github.com/alimikegami/point-of-sales/product-service/internal/infrastructure/database/elasticsearch"
 	"github.com/alimikegami/point-of-sales/product-service/internal/infrastructure/database/mongodb"
 	"github.com/alimikegami/point-of-sales/product-service/internal/infrastructure/message-queue/kafka"
 	"github.com/alimikegami/point-of-sales/product-service/internal/repository"
@@ -28,12 +27,6 @@ func main() {
 	config := config.CreateNewConfig()
 	db, err := mongodb.ConnectToMongoDB(fmt.Sprintf("mongodb://%s:%s", config.MongoDBConfig.DBHost, config.MongoDBConfig.DBPort))
 	if err != nil {
-		panic(err)
-	}
-
-	elasticSearchClient, err := elasticsearch.CreateElasticsearchClient(config)
-	if err != nil {
-		fmt.Println(err)
 		panic(err)
 	}
 
@@ -60,7 +53,7 @@ func main() {
 	})
 
 	mongoDBRepo := repository.CreateNewMongoDBRepository(db)
-	elasticSearchRepo := repository.CreateNewElasticSearchRepository(elasticSearchClient)
+	elasticSearchRepo := repository.CreateNewElasticSearchRepository(config)
 	svc := service.CreateProductService(mongoDBRepo, elasticSearchRepo, *config, kafkaReader, kafkaProducer)
 	controller.CreateProductController(g, svc, IsLoggedIn)
 
