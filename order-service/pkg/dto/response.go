@@ -42,8 +42,10 @@ type ErrorResponse struct {
 }
 
 type Filter struct {
-	Limit int `query:"limit"`
-	Page  int `query:"page"`
+	Limit         int `query:"limit"`
+	Page          int `query:"page"`
+	PaymentStatus string
+	Expired       bool
 }
 
 func WriteSuccessResponse(c echo.Context, message string) error {

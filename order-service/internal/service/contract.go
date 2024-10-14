@@ -11,4 +11,5 @@ type OrderService interface {
 	AddOrder(ctx context.Context, req dto.OrderRequest) (err error)
 	MidtransPaymentWebhook(ctx context.Context, req dto.PaymentNotification) (err error)
 	GetOrders(ctx context.Context, filter pkgdto.Filter) (response pkgdto.Pagination, err error)
+	RestoreExpiredPaymentItemStocks()
 }

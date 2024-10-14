@@ -63,7 +63,7 @@ func (r *OrderRepositoryImpl) GetOrderByTransactionNumber(ctx context.Context, t
 }
 
 func (r *OrderRepositoryImpl) UpdateOrderPaymentStatus(ctx context.Context, data domain.Order) (err error) {
-	_, err = r.db.NamedExecContext(ctx, "UPDATE orders SET payment_status = 'success' WHERE id=:id AND deleted_at IS NULL", data)
+	_, err = r.db.NamedExecContext(ctx, "UPDATE orders SET payment_status = :payment_status WHERE id=:id AND deleted_at IS NULL", data)
 	if err != nil {
 		log.Error().Err(err).Str("component", "UpdateOrderPaymentStatus").Msg("")
 		return
@@ -76,6 +76,15 @@ func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filte
 	query := "SELECT * FROM orders WHERE deleted_at IS NULL"
 
 	args := make(map[string]interface{})
+
+	if filter.PaymentStatus != "" {
+		query += " AND payment_status = :payment_status"
+		args["payment_status"] = filter.PaymentStatus
+	}
+
+	if filter.Expired {
+		query += " AND expired_at < EXTRACT(EPOCH FROM NOW())"
+	}
 
 	if filter.Limit != 0 && filter.Page != 0 {
 		offset := (filter.Page - 1) * filter.Limit
@@ -93,6 +102,26 @@ func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filte
 	err = nstmt.SelectContext(ctx, &data, args)
 	if err != nil {
 		log.Error().Err(err).Str("component", "GetOrders").Msg("")
+		return nil, err
+	}
+
+	return
+}
+
+func (r *OrderRepositoryImpl) GetOrderDetailsByOrderID(ctx context.Context, id uint64) (data []domain.OrderDetail, err error) {
+	query := "SELECT * FROM order_details WHERE order_id = :order_id"
+	args := make(map[string]interface{})
+	args["order_id"] = id
+
+	nstmt, err := r.db.PrepareNamedContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
+		return nil, err
+	}
+
+	err = nstmt.SelectContext(ctx, &data, args)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
 		return nil, err
 	}
 
@@ -128,86 +157,3 @@ func (r *OrderRepositoryImpl) HandleTrx(ctx context.Context, fn func(ctx context
 
 	return nil
 }
-
-// func (r *OrderRepositoryImpl) AddOrder(ctx context.Context, data domain.Order) (id int64, err error) {
-// 	err = r.db.WithContext(ctx).Create(&data).Error
-
-// 	if err != nil {
-// 		log.Error().Err(err).Str("component", "AddOrder").Msg("")
-// 		return 0, errs.ErrInternalServer
-// 	}
-
-// 	return data.ID, nil
-// }
-
-// func (r *OrderRepositoryImpl) AddOrderDetails(ctx context.Context, data []domain.OrderDetail) (err error) {
-// 	err = r.db.WithContext(ctx).Create(&data).Error
-
-// 	if err != nil {
-// 		log.Error().Err(err).Str("component", "AddOrderDetails").Msg("")
-// 		return errs.ErrInternalServer
-// 	}
-
-// 	return nil
-// }
-
-// func (r *OrderRepositoryImpl) GetOrderByTransactionNumber(ctx context.Context, transactionNumber string) (data domain.Order, err error) {
-// 	err = r.db.WithContext(ctx).Where("transaction_number = ?", transactionNumber).First(&data).Error
-
-// 	if err != nil {
-// 		log.Error().Err(err).Str("component", "GetOrderByTransactionNumber").Msg("")
-// 		return data, errs.ErrInternalServer
-// 	}
-
-// 	return data, nil
-// }
-
-// func (r *OrderRepositoryImpl) UpdateOrderPaymentStatus(ctx context.Context, data domain.Order) (err error) {
-// 	err = r.db.WithContext(ctx).Model(&data).Updates(data).Error
-
-// 	if err != nil {
-// 		log.Error().Err(err).Str("component", "UpdateOrderPaymentStatus").Msg("")
-// 		return errs.ErrInternalServer
-// 	}
-
-// 	return nil
-// }
-
-// func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) (data []domain.Order, err error) {
-// 	err = r.db.WithContext(ctx).Preload("PaymentMethod").Find(&data).Error
-
-// 	if err != nil {
-// 		log.Error().Err(err).Str("component", "GetOrders").Msg("")
-// 		return data, errs.ErrInternalServer
-// 	}
-
-// 	return
-// }
-
-// func (r *OrderRepositoryImpl) HandleTrx(ctx context.Context, fn func(repo OrderRepository) error) error {
-
-// 	tx := r.db.Begin()
-
-// 	defer func() {
-// 		if r := recover(); r != nil {
-// 			tx.Rollback()
-// 		}
-// 	}()
-
-// 	if err := tx.Error; err != nil {
-// 		return err
-// 	}
-
-// 	newRepo := &OrderRepositoryImpl{
-// 		db: tx,
-// 	}
-
-// 	err := fn(newRepo)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	err = tx.Commit().Error
-
-// 	return err
-// }

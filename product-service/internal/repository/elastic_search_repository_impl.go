@@ -55,6 +55,10 @@ func (r *ElasticSearchProductRepositoryImpl) GetProducts(ctx context.Context, fi
 		param["from"] = (filter.Page - 1) * filter.Limit
 	}
 
+	if filter.Q != "" {
+
+	}
+
 	requestPayload, err := json.Marshal(param)
 	if err != nil {
 		return
@@ -123,9 +127,9 @@ func (r *ElasticSearchProductRepositoryImpl) AddProductQuantities(ctx context.Co
 		param := make(map[string]interface{})
 
 		param["script"] = map[string]interface{}{
-			"language": "painless",
-			"source":   "ctx._source.quantity += params.addition",
-			"param": map[string]interface{}{
+			"lang":   "painless",
+			"source": "ctx._source.quantity += params.addition",
+			"params": map[string]interface{}{
 				"addition": product.Quantity,
 			},
 		}

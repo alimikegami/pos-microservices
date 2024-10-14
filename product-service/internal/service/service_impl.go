@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/alimikegami/point-of-sales/product-service/config"
 	"github.com/alimikegami/point-of-sales/product-service/internal/domain"
@@ -15,7 +16,6 @@ import (
 	"github.com/alimikegami/point-of-sales/product-service/pkg/errs"
 	"github.com/segmentio/kafka-go"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ProductServiceImpl struct {
@@ -59,7 +59,7 @@ func (s *ProductServiceImpl) AddProduct(ctx context.Context, data dto.ProductReq
 	fmt.Printf("%+v\n", kafkaMsg)
 	jsonMsg, err := json.Marshal(kafkaMsg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal Kafka message: %w", err)
+		return err
 	}
 
 	maxRetries := 3
@@ -68,12 +68,12 @@ func (s *ProductServiceImpl) AddProduct(ctx context.Context, data dto.ProductReq
 		if err == nil {
 			break
 		}
-		log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+		log.Error().Err(err).Str("component", "AddProduct").Msg("")
 		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
+		return err
 	}
 
 	return
@@ -123,13 +123,13 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 	for {
 		msg, err := s.kafkaReader.ReadMessage(context.Background())
 		if err != nil {
-			fmt.Println("Error reading Kafka message:", err)
+			log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 			continue
 		}
 
 		var receivedMsg dto.KafkaMessage
 		if err := json.Unmarshal(msg.Value, &receivedMsg); err != nil {
-			fmt.Println("Error unmarshalling Kafka message:", err)
+			log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 			continue
 		}
 
@@ -139,17 +139,17 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var productData dto.ProductResponse
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 			if err := json.Unmarshal(dataBytes, &productData); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			err = s.AddProductToElasticsearch(context.Background(), productData)
 			if err != nil {
-				fmt.Println("Error:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -158,17 +158,17 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var products []domain.Product
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			if err := json.Unmarshal(dataBytes, &products); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 			err = s.DecreaseElasticSearchProductQuantity(context.Background(), products)
 			if err != nil {
-				fmt.Println("Error:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -177,18 +177,18 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var product dto.Product
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			if err := json.Unmarshal(dataBytes, &product); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			err = s.DeleteElasticSearchProduct(context.Background(), product.ID)
 			if err != nil {
-				fmt.Println("Error:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -197,18 +197,18 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var product dto.Product
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			if err := json.Unmarshal(dataBytes, &product); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			err = s.UpdateElasticSearchProduct(context.Background(), product)
 			if err != nil {
-				fmt.Println("Error:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -217,12 +217,12 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var orderRequest dto.OrderRequest
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			if err := json.Unmarshal(dataBytes, &orderRequest); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -243,7 +243,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 
 			jsonMsg, err := json.Marshal(kafkaMsg)
 			if err != nil {
-				log.Println("failed to marshal Kafka message: ", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -253,7 +253,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 				if err == nil {
 					break
 				}
-				log.Printf("Failed to write Kafka message (attempt %d/%d): %v\n", i+1, maxRetries, err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
 			}
 
@@ -267,17 +267,17 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var products []domain.Product
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			if err := json.Unmarshal(dataBytes, &products); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 			err = s.AddElasticSearchProductQuantity(context.Background(), products)
 			if err != nil {
-				fmt.Println("Error:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -286,17 +286,17 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 			var orderReq dto.OrderRequest
 			dataBytes, err := json.Marshal(receivedMsg.Data)
 			if err != nil {
-				fmt.Println("Error marshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
 			if err := json.Unmarshal(dataBytes, &orderReq); err != nil {
-				fmt.Println("Error unmarshalling user data:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 			err = s.RestoreProductStock(context.Background(), orderReq)
 			if err != nil {
-				fmt.Println("Error:", err)
+				log.Error().Err(err).Str("component", "ConsumeEvent").Msg("")
 				continue
 			}
 
@@ -308,28 +308,24 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 }
 
 func (s *ProductServiceImpl) RestoreProductStock(ctx context.Context, req dto.OrderRequest) (err error) {
-	err = s.mongoDBRepo.HandleTrx(ctx, func(ctx mongo.SessionContext, repo repository.MongoDBProductRepository) error {
-		for _, orderItem := range req.OrderItems {
-			productID, err := primitive.ObjectIDFromHex(orderItem.ProductID)
-			if err != nil {
-				return err
-			}
-
-			err = repo.UpdateProductQuantity(ctx, domain.Product{
-				ID:       productID,
-				Quantity: uint64(orderItem.Quantity),
-			})
-			if err != nil {
-				return err
-			}
+	// err = s.mongoDBRepo.HandleTrx(ctx, func(ctx mongo.SessionContext, repo repository.MongoDBProductRepository) error {
+	for _, orderItem := range req.OrderItems {
+		productID, err := primitive.ObjectIDFromHex(orderItem.ProductID)
+		if err != nil {
+			return err
 		}
 
-		return nil
-	})
-
-	if err != nil {
-		return err
+		err = s.mongoDBRepo.UpdateProductQuantity(ctx, domain.Product{
+			ID:       productID,
+			Quantity: uint64(orderItem.Quantity),
+		})
+		if err != nil {
+			return err
+		}
 	}
+
+	// return nil
+	// })
 
 	var products []domain.Product
 
@@ -372,9 +368,9 @@ func (s *ProductServiceImpl) RestoreProductStock(ctx context.Context, req dto.Or
 }
 
 func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto.OrderRequest) (err error) {
+	// TODO: handle transactions
 	// err = s.mongoDBRepo.HandleTrx(ctx, func(ctx mongo.SessionContext, repo repository.MongoDBProductRepository) error {
-	for idx, orderItem := range req.OrderItems {
-		fmt.Println(idx)
+	for _, orderItem := range req.OrderItems {
 		product, err := s.mongoDBRepo.GetProductByID(ctx, orderItem.ProductID)
 		if err != nil {
 			return err

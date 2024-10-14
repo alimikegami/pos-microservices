@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/controller"
@@ -12,6 +13,7 @@ import (
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/dto"
+	"github.com/go-co-op/gocron/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
@@ -59,6 +61,25 @@ func main() {
 	orderRepo := repository.CreateOrderRepository(db)
 	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer)
 	controller.CreateOrderController(g, orderSvc, IsLoggedIn)
+	s, err := gocron.NewScheduler()
+	if err != nil {
+		panic(err)
+	}
+
+	// add a job to the scheduler
+	_, err = s.NewJob(
+		gocron.DurationJob(
+			10*time.Second,
+		),
+		gocron.NewTask(
+			orderSvc.RestoreExpiredPaymentItemStocks,
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	s.Start()
 
 	e.Logger.Fatal(e.Start(":8083"))
 }

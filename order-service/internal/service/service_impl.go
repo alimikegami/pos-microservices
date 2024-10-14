@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/alimikegami/point-of-sales/order-service/internal/domain"
 	"github.com/alimikegami/point-of-sales/order-service/internal/dto"
@@ -110,7 +111,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			if err == nil {
 				break
 			}
-			log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
+			log.Error().Err(err).Str("component", "AddOrder").Msg("")
 			time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
 		}
 
@@ -204,13 +205,11 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 	})
 
 	if err != nil {
-		fmt.Println(err)
 		kafkaMsg := dto.KafkaMessage{
 			EventType: "restore_product_stock",
 			Data:      productReqPayload,
 		}
 
-		fmt.Printf("%+v\n", kafkaMsg)
 		jsonMsg, err := json.Marshal(kafkaMsg)
 		if err != nil {
 			return fmt.Errorf("failed to marshal Kafka message: %w", err)
@@ -272,13 +271,13 @@ func (s *OrderServiceImpl) listenForProductStockUpdate(transactionNumber string)
 					if err == context.DeadlineExceeded {
 						return
 					}
-					log.Println("Error reading Kafka message:", err)
+					log.Error().Err(err).Str("component", "listenForProductStockUpdate").Msg("")
 					continue
 				}
 
 				var receivedMsg dto.KafkaMessage
 				if err := json.Unmarshal(msg.Value, &receivedMsg); err != nil {
-					log.Println("Error unmarshalling Kafka message:", err)
+					log.Error().Err(err).Str("component", "listenForProductStockUpdate").Msg("")
 					continue
 				}
 
@@ -288,11 +287,11 @@ func (s *OrderServiceImpl) listenForProductStockUpdate(transactionNumber string)
 					var stockUpdateData dto.ProductServiceStockUpdate
 					dataBytes, err := json.Marshal(receivedMsg.Data)
 					if err != nil {
-						log.Println("Error marshalling user data:", err)
+						log.Error().Err(err).Str("component", "listenForProductStockUpdate").Msg("")
 						continue
 					}
 					if err := json.Unmarshal(dataBytes, &stockUpdateData); err != nil {
-						log.Println("Error unmarshalling user data:", err)
+						log.Error().Err(err).Str("component", "listenForProductStockUpdate").Msg("")
 						continue
 					}
 
@@ -345,4 +344,62 @@ func (s *OrderServiceImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) 
 	response.Records = orderResponse
 
 	return
+}
+
+func (s *OrderServiceImpl) RestoreExpiredPaymentItemStocks() {
+	log.Info().Str("component", "RestoreExpiredPaymentItemStocks").Msg("cron starts")
+	orders, err := s.repository.GetOrders(context.Background(), pkgdto.Filter{
+		PaymentStatus: "pending",
+		Expired:       true,
+	})
+
+	if err != nil {
+		return
+	}
+
+	for _, order := range orders {
+		order.PaymentStatus = "expired"
+		err = s.repository.UpdateOrderPaymentStatus(context.Background(), order)
+		if err != nil {
+			return
+		}
+
+		orderDetails, err := s.repository.GetOrderDetailsByOrderID(context.Background(), uint64(order.ID))
+		if err != nil {
+			return
+		}
+
+		var orderRequest dto.OrderProductServiceRequest
+		for _, item := range orderDetails {
+			orderRequest.OrderItems = append(orderRequest.OrderItems, dto.OrderItem{
+				ProductID: item.ProductID,
+				Quantity:  int(item.Quantity),
+			})
+		}
+
+		kafkaMsg := dto.KafkaMessage{
+			EventType: "restore_product_stock",
+			Data:      orderRequest,
+		}
+
+		fmt.Printf("%+v\n", kafkaMsg)
+		jsonMsg, err := json.Marshal(kafkaMsg)
+		if err != nil {
+			log.Error().Err(err).Str("component", "RestoreExpiredPaymentItemStocks").Msg("")
+			return
+		}
+
+		maxRetries := 3
+
+		for i := 0; i < maxRetries; i++ {
+			err = s.writeKafkaMessage(jsonMsg)
+			if err == nil {
+				break
+			}
+			log.Error().Err(err).Str("component", "RestoreExpiredPaymentItemStocks").Msg("")
+			time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+		}
+	}
+
+	log.Info().Str("component", "RestoreExpiredPaymentItemStocks").Msg("cron ends")
 }
