@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/domain"
 	"github.com/alimikegami/point-of-sales/order-service/internal/dto"
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
@@ -27,14 +28,16 @@ type OrderServiceImpl struct {
 	midtransClient *coreapi.Client
 	kafkaReader    *kafka.Reader
 	kafkaProducer  *kafka.Conn
+	config         *config.Config
 }
 
-func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn) OrderService {
+func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn, config *config.Config) OrderService {
 	return &OrderServiceImpl{
 		repository:     repository,
 		midtransClient: midtransClient,
 		kafkaReader:    kafkaReader,
 		kafkaProducer:  kafkaProducer,
+		config:         config,
 	}
 }
 
@@ -69,9 +72,8 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			return fmt.Errorf("error marshalling price info request: %v", err)
 		}
 
-		// TODO: config env for product service endpoint
 		priceInfoHttpReq := httpclient.HttpRequest{
-			URL:    "http://localhost:8081/api/v1/products/prices",
+			URL:    fmt.Sprintf("%s/api/v1/products/prices", s.config.ProductServiceHost),
 			Method: "POST",
 			Body:   priceInfoJsonBody,
 			Headers: map[string]string{

@@ -59,7 +59,7 @@ func main() {
 	})
 
 	orderRepo := repository.CreateOrderRepository(db)
-	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer)
+	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer, config)
 	controller.CreateOrderController(g, orderSvc, IsLoggedIn)
 	s, err := gocron.NewScheduler()
 	if err != nil {
