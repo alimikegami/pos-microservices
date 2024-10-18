@@ -58,7 +58,6 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 	err = s.repository.HandleTrx(ctx, func(ctx context.Context, repo repository.OrderRepository) error {
 		var orderDetails []domain.OrderDetail
-
 		productIDs := make([]string, len(req.OrderItems))
 		for i, item := range req.OrderItems {
 			productIDs[i] = item.ProductID
@@ -81,10 +80,13 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			},
 		}
 
+		log.Info().Msg("Making req")
 		statusCode, priceInfoBody, err := httpclient.SendRequest(priceInfoHttpReq)
 		if err != nil {
 			return fmt.Errorf("error calling product price info service: %v", err)
 		}
+
+		log.Info().Msg("Req complete")
 		if statusCode != http.StatusOK {
 			return fmt.Errorf("product price info service returned non-OK status: %d", statusCode)
 		}
@@ -107,7 +109,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		}
 
 		maxRetries := 3
-
+		log.Info().Msg("Publish event")
 		for i := 0; i < maxRetries; i++ {
 			err = s.writeKafkaMessage(jsonMsg)
 			if err == nil {
@@ -125,7 +127,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		if err != nil {
 			return err
 		}
-
+		log.Info().Msg("Event returned")
 		var totalAmount float64
 		chargeItems := make([]midtrans.ItemDetails, len(req.OrderItems))
 		for i, item := range req.OrderItems {
@@ -173,7 +175,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			},
 			Items: &chargeItems,
 		}
-
+		log.Info().Msg("Making req to pg")
 		response, err := s.midtransClient.ChargeTransaction(chargeReq)
 		if response.StatusCode != "201" {
 			return fmt.Errorf("payment gateway returned non-200 status: %s", response.StatusCode)
@@ -183,6 +185,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		if err != nil {
 			return err
 		}
+		log.Info().Msg("Req to pg complete")
 
 		orderID, err := repo.AddOrder(ctx, domain.Order{
 			PaymentMethodID:   int64(req.PaymentMethodID),
