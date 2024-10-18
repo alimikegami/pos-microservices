@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  product-query-service-deployment
+  labels:
+    app:  product-query-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app:  product-query-service
+  template:
+    metadata:
+      labels:
+        app:  product-query-service
+    spec:
+      containers:
+      - name:  product-query-service
+        image: alimikegami/pos:product-query-service-latest
+        envFrom:
+        - configMapRef:
+            name:  product-query-service-config
+        ports:
+        - containerPort: 8080
