@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service-deployment
+  name: product-command-service-deployment
   labels:
-    app: product-service
+    app: product-command-service
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: product-service
+      app: product-command-service
   template:
     metadata:
       labels:
-        app: product-service
+        app: product-command-service
     spec:
       containers:
-      - name: product-service
-        image: alimikegami/pos:product-service-latest
+      - name: product-command-service
+        image: alimikegami/pos:product-command-service-latest
         envFrom:
         - configMapRef:
-            name: product-service-config
+            name: product-command-service-config
         ports:
         - containerPort: 8080
