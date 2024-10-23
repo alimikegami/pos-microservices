@@ -82,6 +82,16 @@ func (s *ProductServiceImpl) writeKafkaMessage(msg []byte) error {
 	return err
 }
 
+func (s *ProductServiceImpl) writeKafkaMessageWithKey(msg []byte, key string) error {
+	_, err := s.kafkaProducer.WriteMessages(
+		kafka.Message{
+			Key:   []byte(key),
+			Value: msg,
+		},
+	)
+	return err
+}
+
 func (s *ProductServiceImpl) ConsumeEvent() {
 	for {
 		msg, err := s.kafkaReader.ReadMessage(context.Background())
@@ -134,7 +144,7 @@ func (s *ProductServiceImpl) ConsumeEvent() {
 
 			maxRetries := 3
 			for i := 0; i < maxRetries; i++ {
-				err = s.writeKafkaMessage(jsonMsg)
+				err = s.writeKafkaMessageWithKey(jsonMsg, orderRequest.TransactionNumber)
 				if err == nil {
 					break
 				}

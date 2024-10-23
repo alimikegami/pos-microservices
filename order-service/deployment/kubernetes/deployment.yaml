@@ -17,6 +17,7 @@ spec:
       containers:
       - name: order-service
         image: alimikegami/pos:order-service
+        imagePullPolicy: Always
         envFrom:
         - configMapRef:
             name: order-service-config

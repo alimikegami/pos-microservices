@@ -17,6 +17,7 @@ spec:
       containers:
       - name: product-command-service
         image: alimikegami/pos:product-command-service-latest
+        imagePullPolicy: Always
         envFrom:
         - configMapRef:
             name: product-command-service-config

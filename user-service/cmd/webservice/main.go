@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/alimikegami/e-commerce/user-service/config"
@@ -39,5 +40,5 @@ func main() {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", config.ServicePort)))
 }

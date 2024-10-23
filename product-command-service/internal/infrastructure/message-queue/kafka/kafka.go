@@ -17,7 +17,6 @@ func CreateKafkaReader(config *config.Config) *kafka.Reader {
 	KafkaReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:          []string{config.KafkaConfig.BrokerAddress},
 		Topic:            config.KafkaConfig.BrokerTopic,
-		Partition:        config.KafkaConfig.BrokerPartition,
 		MinBytes:         1e3, // 1KB
 		MaxBytes:         1e6, // 1MB
 		MaxWait:          100 * time.Millisecond,

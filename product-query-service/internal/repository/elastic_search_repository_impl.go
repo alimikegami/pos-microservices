@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/alimikegami/point-of-sales/product-query-service/config"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/domain"
@@ -118,7 +119,7 @@ func (r *ElasticSearchProductRepositoryImpl) DecreaseProductQuantities(ctx conte
 			return err
 		}
 
-		if statusCode == 200 {
+		if statusCode != 200 {
 			return errs.ErrInternalServer
 		}
 	}
@@ -128,6 +129,7 @@ func (r *ElasticSearchProductRepositoryImpl) DecreaseProductQuantities(ctx conte
 
 func (r *ElasticSearchProductRepositoryImpl) AddProductQuantities(ctx context.Context, products []domain.Product) error {
 	for _, product := range products {
+		fmt.Printf("%+v\n", product)
 		param := make(map[string]interface{})
 
 		param["script"] = map[string]interface{}{

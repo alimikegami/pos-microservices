@@ -74,19 +74,19 @@ data:
             paths:
               - /api/v1/users
             strip_path: true
-      - name: user-service
-        url: http://user-service-service/api/v1/users
+      - name: product-query-service
+        url: http://product-query-service-service/api/v1/products
         routes:
-          - name: user-service-route
+          - name: product-query-service-route
             paths:
-              - /api/v1/users
+              - /api/v1/products-query
             strip_path: true
-      - name: product-service
-        url: http://product-service-service/api/v1/products
+      - name: product-command-service
+        url: http://product-command-service-service/api/v1/products
         routes:
-          - name: product-service-route
+          - name: product-command-service-route
             paths:
-              - /api/v1/products
+              - /api/v1/products-command
             strip_path: true
       - name: order-service
         url: http://order-service-service/api/v1/orders

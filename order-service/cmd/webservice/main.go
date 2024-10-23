@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -81,5 +82,5 @@ func main() {
 
 	s.Start()
 
-	e.Logger.Fatal(e.Start(":8083"))
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", config.ServicePort)))
 }

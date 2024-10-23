@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	ServicePort      string
 	PostgreSQLConfig PostgreSQLConfig
 	JWTSecret        string
 	KafkaConfig      KafkaConfig
@@ -17,6 +18,7 @@ func CreateNewConfig() *Config {
 	godotenv.Load(".env")
 
 	conf := Config{
+		ServicePort: os.Getenv("SERVICE_PORT"),
 		PostgreSQLConfig: PostgreSQLConfig{
 			DBHost:     os.Getenv("DB_HOST"),
 			DBName:     os.Getenv("DB_NAME"),

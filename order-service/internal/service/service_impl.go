@@ -87,6 +87,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		}
 
 		log.Info().Msg("Req complete")
+		log.Info().Msg(http.StatusText(statusCode))
 		if statusCode != http.StatusOK {
 			return fmt.Errorf("product price info service returned non-OK status: %d", statusCode)
 		}
@@ -111,7 +112,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		maxRetries := 3
 		log.Info().Msg("Publish event")
 		for i := 0; i < maxRetries; i++ {
-			err = s.writeKafkaMessage(jsonMsg)
+			err = s.writeKafkaMessageWithKey(jsonMsg, trxNumber.String())
 			if err == nil {
 				break
 			}
@@ -222,7 +223,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 		maxRetries := 3
 		for i := 0; i < maxRetries; i++ {
-			err = s.writeKafkaMessage(jsonMsg)
+			err = s.writeKafkaMessageWithKey(jsonMsg, trxNumber.String())
 			if err == nil {
 				break
 			}
@@ -322,6 +323,16 @@ func (s *OrderServiceImpl) listenForProductStockUpdate(transactionNumber string)
 	case <-ctx.Done():
 		return fmt.Errorf("timeout waiting for stock update")
 	}
+}
+
+func (s *OrderServiceImpl) writeKafkaMessageWithKey(msg []byte, key string) error {
+	_, err := s.kafkaProducer.WriteMessages(
+		kafka.Message{
+			Key:   []byte(key),
+			Value: msg,
+		},
+	)
+	return err
 }
 
 func (s *OrderServiceImpl) writeKafkaMessage(msg []byte) error {
