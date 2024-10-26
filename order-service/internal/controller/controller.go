@@ -32,13 +32,12 @@ func (c *Controller) AddOrder(e echo.Context) error {
 		log.Error().Err(err).Str("component", "AddOrder").Msg("")
 	}
 
-	err = c.service.AddOrder(e.Request().Context(), payload)
-
+	resp, err := c.service.AddOrder(e.Request().Context(), payload)
 	if err != nil {
 		return response.WriteErrorResponse(e, err, nil)
 	}
 
-	return response.WriteSuccessResponse(e, "", nil)
+	return response.WriteSuccessResponse(e, "", resp)
 }
 
 func (c *Controller) MidtransPaymentWebhook(e echo.Context) error {

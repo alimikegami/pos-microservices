@@ -7,12 +7,13 @@ import (
 )
 
 type Config struct {
-	ServicePort        string
-	PostgreSQLConfig   PostgreSQLConfig
-	JWTSecret          string
-	MidtransConfig     MidtransConfig
-	KafkaConfig        KafkaConfig
-	ProductServiceHost string
+	ServicePort               string
+	PostgreSQLConfig          PostgreSQLConfig
+	JWTSecret                 string
+	MidtransConfig            MidtransConfig
+	KafkaConfig               KafkaConfig
+	ProductQueryServiceHost   string
+	ProductCommandServiceHost string
 }
 
 func CreateNewConfig() *Config {
@@ -35,7 +36,8 @@ func CreateNewConfig() *Config {
 		MidtransConfig: MidtransConfig{
 			ServerKey: os.Getenv("MIDTRANS_SERVER_KEY"),
 		},
-		ProductServiceHost: os.Getenv("PRODUCT_SERVICE_HOST"),
+		ProductQueryServiceHost:   os.Getenv("PRODUCT_QUERY_SERVICE_HOST"),
+		ProductCommandServiceHost: os.Getenv("PRODUCT_COMMAND_SERVICE_HOST"),
 	}
 
 	return &conf

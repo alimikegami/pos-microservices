@@ -268,9 +268,9 @@ func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto
 	// 	return nil
 	// })
 
-	if err != nil {
-		return err
-	}
+	// if err != nil {
+	// 	return err
+	// }
 
 	var products []domain.Product
 

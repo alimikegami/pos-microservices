@@ -20,7 +20,6 @@ require (
 )
 
 require (
-	github.com/elastic/go-elasticsearch v0.0.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/gommon v0.4.2 // indirect

@@ -6,4 +6,5 @@ type OrderResponse struct {
 	TransactionAmount float64 `json:"transaction_amount"`
 	PaymentStatus     string  `json:"payment_status"`
 	PaymentExpiredAt  *int64  `json:"payment_expired_at"`
+	QRCode            *string `json:"qr_code"`
 }

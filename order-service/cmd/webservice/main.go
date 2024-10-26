@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	_ "time/tzdata"
+
 	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/controller"
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/database/postgres"

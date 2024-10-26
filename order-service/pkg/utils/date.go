@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"time"
+	_ "time/tzdata"
 )
 
 func ConvertDateTimeToHumanReadableFormat(datetime int64) (string, error) {
