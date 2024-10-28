@@ -4,7 +4,7 @@ metadata:
   name: product-command-service-config
 data:
   SERVICE_PORT: "8080"
-  DB_HOST: "product-service-db"
+  DB_HOST: "mongodb"
   DB_PORT: "27017"
   JWT_SECRET: "1234"
   BROKER_ADDRESS: "kafka-service:9092"

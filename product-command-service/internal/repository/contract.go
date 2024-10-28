@@ -12,7 +12,7 @@ import (
 type MongoDBProductRepository interface {
 	AddProduct(ctx context.Context, data domain.Product) (id primitive.ObjectID, err error)
 	GetProducts(ctx context.Context, param pkgdto.Filter) (data []domain.Product, err error)
-	HandleTrx(ctx context.Context, fn func(ctx mongo.SessionContext, repo MongoDBProductRepository) error) error
+	HandleTrx(ctx context.Context, fn func(ctx mongo.SessionContext) error) error
 	GetProductByID(ctx context.Context, id string) (product domain.Product, err error)
 	DeleteProduct(ctx context.Context, id string) (err error)
 	UpdateProduct(ctx context.Context, data domain.Product) (err error)

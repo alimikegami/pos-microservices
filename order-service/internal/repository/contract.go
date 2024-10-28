@@ -16,4 +16,6 @@ type OrderRepository interface {
 	UpdateOrderPaymentStatus(ctx context.Context, data domain.Order) (err error)
 	GetOrders(ctx context.Context, filter pkgdto.Filter) (data []domain.Order, err error)
 	GetOrderDetailsByOrderID(ctx context.Context, id uint64) (data []domain.OrderDetail, err error)
+
+	GetPaymentMethodByID(ctx context.Context, id uint64) (data domain.PaymentMethod, err error)
 }

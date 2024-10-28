@@ -1,19 +1,36 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: product-service-db
+  name: mongodb
 spec:
-  replicas: 1
+  serviceName: mongodb
+  replicas: 3
   selector:
     matchLabels:
-      app: product-service-db
+      app: mongodb
   template:
     metadata:
       labels:
-        app: product-service-db
+        app: mongodb
     spec:
       containers:
-        - name: product-service-db
-          image: mongo
-          ports:
-            - containerPort: 27017
+      - name: mongodb
+        image: mongo:6.0
+        command: 
+        - mongod
+        - "--replSet"
+        - "rs0"
+        - "--bind_ip_all"
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

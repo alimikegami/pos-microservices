@@ -25,6 +25,7 @@ func CreateOrderController(e *echo.Group, service service.OrderService, isLogged
 
 func (c *Controller) AddOrder(e echo.Context) error {
 	// _, userName, userID := utils.ExtractTokenUser(e)
+	log.Info().Msg("add order req start")
 
 	payload := dto.OrderRequest{}
 	err := e.Bind(&payload)

@@ -25,7 +25,7 @@ func main() {
 	log.Logger = logger
 
 	config := config.CreateNewConfig()
-	db, err := mongodb.ConnectToMongoDB(fmt.Sprintf("mongodb://%s:%s", config.MongoDBConfig.DBHost, config.MongoDBConfig.DBPort))
+	db, err := mongodb.ConnectToMongoDB(config.MongoDBConfig.DBHost, config.MongoDBConfig.DBPort)
 	if err != nil {
 		panic(err)
 	}

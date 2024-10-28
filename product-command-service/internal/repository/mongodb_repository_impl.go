@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/domain"
 	pkgdto "github.com/alimikegami/point-of-sales/product-command-service/pkg/dto"
@@ -74,9 +75,11 @@ func (r *MongoDBProductRepositoryImpl) GetProductByID(ctx context.Context, id st
 	return product, nil
 }
 
-func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ctx mongo.SessionContext, repo MongoDBProductRepository) error) error {
+func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ctx mongo.SessionContext) error) error {
+	fmt.Println("starting session mongodb")
 	session, err := r.db.Client().StartSession()
 	if err != nil {
+		log.Error().Err(err).Str("component", "HandleTrx").Msg("")
 		panic(err)
 	}
 
@@ -84,8 +87,10 @@ func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ct
 	defer session.EndSession(ctx)
 
 	_, err = session.WithTransaction(ctx, func(ctx mongo.SessionContext) (interface{}, error) {
-		err := fn(ctx, r)
-
+		err := fn(ctx)
+		if err != nil {
+			log.Error().Err(err).Str("component", "HandleTrx").Msg("")
+		}
 		return nil, err
 	})
 

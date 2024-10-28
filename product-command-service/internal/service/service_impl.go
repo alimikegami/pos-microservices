@@ -15,6 +15,7 @@ import (
 	"github.com/alimikegami/point-of-sales/product-command-service/pkg/errs"
 	"github.com/segmentio/kafka-go"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ProductServiceImpl struct {
@@ -245,32 +246,32 @@ func (s *ProductServiceImpl) RestoreProductStock(ctx context.Context, req dto.Or
 
 func (s *ProductServiceImpl) UpdateProductsQuantity(ctx context.Context, req dto.OrderRequest) (err error) {
 	// TODO: handle transactions
-	// err = s.mongoDBRepo.HandleTrx(ctx, func(ctx mongo.SessionContext, repo repository.MongoDBProductRepository) error {
-	for _, orderItem := range req.OrderItems {
-		product, err := s.mongoDBRepo.GetProductByID(ctx, orderItem.ProductID)
-		if err != nil {
-			return err
+	err = s.mongoDBRepo.HandleTrx(ctx, func(sessionCtx mongo.SessionContext) error {
+		for _, orderItem := range req.OrderItems {
+			product, err := s.mongoDBRepo.GetProductByID(sessionCtx, orderItem.ProductID)
+			if err != nil {
+				return err
+			}
+
+			if product.Quantity < uint64(orderItem.Quantity) {
+				return errs.ErrConflict
+			}
+
+			err = s.mongoDBRepo.SetProductQuantity(sessionCtx, domain.Product{
+				ID:       product.ID,
+				Quantity: product.Quantity - uint64(orderItem.Quantity),
+			})
+			if err != nil {
+				return err
+			}
 		}
 
-		if product.Quantity < uint64(orderItem.Quantity) {
-			return errs.ErrConflict
-		}
+		return nil
+	})
 
-		err = s.mongoDBRepo.SetProductQuantity(ctx, domain.Product{
-			ID:       product.ID,
-			Quantity: product.Quantity - uint64(orderItem.Quantity),
-		})
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
-
-	// 	return nil
-	// })
-
-	// if err != nil {
-	// 	return err
-	// }
 
 	var products []domain.Product
 

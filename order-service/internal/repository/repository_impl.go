@@ -73,7 +73,7 @@ func (r *OrderRepositoryImpl) UpdateOrderPaymentStatus(ctx context.Context, data
 }
 
 func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) (data []domain.Order, err error) {
-	query := "SELECT * FROM orders WHERE deleted_at IS NULL"
+	query := "SELECT * FROM orders WHERE deleted_at IS NULL ORDER BY id DESC"
 
 	args := make(map[string]interface{})
 
@@ -123,6 +123,21 @@ func (r *OrderRepositoryImpl) GetOrderDetailsByOrderID(ctx context.Context, id u
 	if err != nil {
 		log.Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
 		return nil, err
+	}
+
+	return
+}
+
+func (r *OrderRepositoryImpl) GetPaymentMethodByID(ctx context.Context, id uint64) (data domain.PaymentMethod, err error) {
+	row := r.tx.QueryRowxContext(ctx, "SELECT * FROM payment_methods WHERE id = $1 AND deleted_at IS NULL", id)
+
+	err = row.StructScan(&data)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetPaymentMethodByID").Msg("")
+		if err == sql.ErrNoRows {
+			return data, nil
+		}
+		return data, errs.ErrInternalServer
 	}
 
 	return
