@@ -108,7 +108,27 @@ func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filte
 	return
 }
 
-func (r *OrderRepositoryImpl) GetOrderDetailsByOrderID(ctx context.Context, id uint64) (data []domain.OrderDetail, err error) {
+func (r *OrderRepositoryImpl) GetOrderByOrderID(ctx context.Context, id int64) (data domain.Order, err error) {
+	query := "SELECT * FROM order WHERE id = :id"
+	args := make(map[string]interface{})
+	args["id"] = id
+
+	nstmt, err := r.db.PrepareNamedContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetOrderByOrderID").Msg("")
+		return data, err
+	}
+
+	err = nstmt.SelectContext(ctx, &data, args)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetOrderByOrderID").Msg("")
+		return data, err
+	}
+
+	return
+}
+
+func (r *OrderRepositoryImpl) GetOrderDetailsByOrderID(ctx context.Context, id int64) (data []domain.OrderDetail, err error) {
 	query := "SELECT * FROM order_details WHERE order_id = :order_id"
 	args := make(map[string]interface{})
 	args["order_id"] = id

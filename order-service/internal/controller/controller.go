@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"strconv"
+
 	"github.com/alimikegami/point-of-sales/order-service/internal/dto"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
 	pkgdto "github.com/alimikegami/point-of-sales/order-service/pkg/dto"
@@ -21,6 +23,7 @@ func CreateOrderController(e *echo.Group, service service.OrderService, isLogged
 	e.POST("/orders", c.AddOrder)
 	e.POST("/orders/payments/notifications", c.MidtransPaymentWebhook)
 	e.GET("/orders", c.GetOrders)
+	e.GET("/orders/:id", c.GetOrderDetails)
 }
 
 func (c *Controller) AddOrder(e echo.Context) error {
@@ -61,7 +64,8 @@ func (c *Controller) GetOrders(e echo.Context) error {
 	filter := pkgdto.Filter{}
 	err := e.Bind(&filter)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddProduct").Msg("")
+		log.Error().Err(err).Str("component", "GetOrders").Msg("")
+		return response.WriteErrorResponse(e, err, nil)
 	}
 
 	responsePayload, err := c.service.GetOrders(e.Request().Context(), filter)
@@ -71,4 +75,21 @@ func (c *Controller) GetOrders(e echo.Context) error {
 	}
 
 	return response.WriteSuccessResponse(e, "successfuly retrieved orders record", responsePayload)
+}
+
+func (c *Controller) GetOrderDetails(e echo.Context) error {
+	id := e.Param("id")
+	idInt64, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		log.Error().Err(err).Str("component", "GetOrderDetails").Msg("")
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	responsePayload, err := c.service.GetOrderDetails(e.Request().Context(), idInt64)
+
+	if err != nil {
+		return response.WriteErrorResponse(e, err, nil)
+	}
+
+	return response.WriteSuccessResponse(e, "successfuly retrieved order details", responsePayload)
 }

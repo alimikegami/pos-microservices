@@ -359,10 +359,42 @@ func (s *OrderServiceImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) 
 			PaymentStatus:     data.PaymentStatus,
 			TransactionAmount: data.Amount,
 			PaymentMethodName: data.PaymentMethod.Name,
+			CreatedAt:         data.CreatedAt,
+			TransactionNumber: data.TransactionNumber,
 		})
 	}
 
 	response.Records = orderResponse
+
+	return
+}
+
+func (s *OrderServiceImpl) GetOrderDetails(ctx context.Context, id int64) (response dto.OrderDetails, err error) {
+	order, err := s.repository.GetOrderByOrderID(ctx, id)
+	if err != nil {
+		return
+	}
+
+	response.ID = order.ID
+	response.PaymentStatus = order.PaymentStatus
+	response.TransactionAmount = order.Amount
+	response.PaymentMethodName = order.PaymentMethod.Name
+	response.CreatedAt = order.CreatedAt
+	response.TransactionNumber = order.TransactionNumber
+
+	orderItems, err := s.repository.GetOrderDetailsByOrderID(ctx, id)
+	if err != nil {
+		return
+	}
+
+	for _, orderItem := range orderItems {
+		response.OrderItems = append(response.OrderItems, dto.OrderItemResponse{
+			ID:          orderItem.ID,
+			ProductName: orderItem.ProductName,
+			Quantity:    int(orderItem.Quantity),
+			Price:       orderItem.Amount,
+		})
+	}
 
 	return
 }
@@ -385,7 +417,7 @@ func (s *OrderServiceImpl) RestoreExpiredPaymentItemStocks() {
 			return
 		}
 
-		orderDetails, err := s.repository.GetOrderDetailsByOrderID(context.Background(), uint64(order.ID))
+		orderDetails, err := s.repository.GetOrderDetailsByOrderID(context.Background(), order.ID)
 		if err != nil {
 			return
 		}
