@@ -3,10 +3,10 @@ package domain
 type PaymentMethod struct {
 	ID        uint64  `db:"id"`
 	Name      string  `db:"name"`
-	Channel   string  `db:"channel"`
+	Channel   *string `db:"channel"`
 	MDR       float64 `db:"mdr"`
 	MDRType   string  `db:"mdr_type"`
-	ImgURL    string  `db:"img_url"`
+	ImgURL    *string `db:"img_url"`
 	CreatedAt int64   `db:"created_at"`
 	UpdatedAt int64   `db:"updated_at"`
 	DeletedAt *int64  `db:"deleted_at"`

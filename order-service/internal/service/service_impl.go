@@ -57,12 +57,13 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		})
 	}
 
+	paymentMethod, err := s.repository.GetPaymentMethodByID(ctx, req.PaymentMethodID)
+	if err != nil {
+		return orderResponse, err
+	}
+
 	err = s.repository.HandleTrx(ctx, func(ctx context.Context, repo repository.OrderRepository) error {
 		var paymentType coreapi.CoreapiPaymentType
-		paymentMethod, err := repo.GetPaymentMethodByID(ctx, req.PaymentMethodID)
-		if err != nil {
-			return err
-		}
 
 		var orderDetails []domain.OrderDetail
 		productIDs := make([]string, len(req.OrderItems))
@@ -352,6 +353,9 @@ func (s *OrderServiceImpl) writeKafkaMessage(msg []byte) error {
 func (s *OrderServiceImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) (response pkgdto.Pagination, err error) {
 	var orderResponse []dto.OrderResponse
 	datas, err := s.repository.GetOrders(ctx, filter)
+	if err != nil {
+		return
+	}
 
 	for _, data := range datas {
 		orderResponse = append(orderResponse, dto.OrderResponse{
@@ -375,10 +379,15 @@ func (s *OrderServiceImpl) GetOrderDetails(ctx context.Context, id int64) (respo
 		return
 	}
 
+	paymentMethod, err := s.repository.GetPaymentMethodByID(ctx, uint64(order.PaymentMethodID))
+	if err != nil {
+		return
+	}
+
 	response.ID = order.ID
 	response.PaymentStatus = order.PaymentStatus
 	response.TransactionAmount = order.Amount
-	response.PaymentMethodName = order.PaymentMethod.Name
+	response.PaymentMethodName = paymentMethod.Name
 	response.CreatedAt = order.CreatedAt
 	response.TransactionNumber = order.TransactionNumber
 

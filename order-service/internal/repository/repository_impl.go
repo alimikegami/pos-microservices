@@ -73,7 +73,7 @@ func (r *OrderRepositoryImpl) UpdateOrderPaymentStatus(ctx context.Context, data
 }
 
 func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filter) (data []domain.Order, err error) {
-	query := "SELECT * FROM orders WHERE deleted_at IS NULL ORDER BY id DESC"
+	query := "SELECT * FROM orders WHERE deleted_at IS NULL"
 
 	args := make(map[string]interface{})
 
@@ -93,6 +93,7 @@ func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filte
 		args["offset"] = offset
 	}
 
+	query += " ORDER BY id DESC"
 	nstmt, err := r.db.PrepareNamedContext(ctx, query)
 	if err != nil {
 		log.Error().Err(err).Str("component", "GetOrders").Msg("")
@@ -109,20 +110,15 @@ func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filte
 }
 
 func (r *OrderRepositoryImpl) GetOrderByOrderID(ctx context.Context, id int64) (data domain.Order, err error) {
-	query := "SELECT * FROM order WHERE id = :id"
-	args := make(map[string]interface{})
-	args["id"] = id
+	row := r.db.QueryRowxContext(ctx, "SELECT * FROM orders WHERE id = $1 AND deleted_at IS NULL", id)
 
-	nstmt, err := r.db.PrepareNamedContext(ctx, query)
+	err = row.StructScan(&data)
 	if err != nil {
 		log.Error().Err(err).Str("component", "GetOrderByOrderID").Msg("")
-		return data, err
-	}
-
-	err = nstmt.SelectContext(ctx, &data, args)
-	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrderByOrderID").Msg("")
-		return data, err
+		if err == sql.ErrNoRows {
+			return data, nil
+		}
+		return data, errs.ErrInternalServer
 	}
 
 	return
@@ -149,7 +145,7 @@ func (r *OrderRepositoryImpl) GetOrderDetailsByOrderID(ctx context.Context, id i
 }
 
 func (r *OrderRepositoryImpl) GetPaymentMethodByID(ctx context.Context, id uint64) (data domain.PaymentMethod, err error) {
-	row := r.tx.QueryRowxContext(ctx, "SELECT * FROM payment_methods WHERE id = $1 AND deleted_at IS NULL", id)
+	row := r.db.QueryRowxContext(ctx, "SELECT * FROM payment_methods WHERE id = $1 AND deleted_at IS NULL", id)
 
 	err = row.StructScan(&data)
 	if err != nil {
