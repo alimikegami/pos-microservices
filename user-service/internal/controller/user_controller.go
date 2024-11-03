@@ -20,7 +20,7 @@ func CreateController(e *echo.Group, service service.UserService) {
 	uc := Controller{
 		service: service,
 	}
-	e.POST("/users", uc.AddUser)
+	e.POST("/users/register", uc.AddUser)
 	e.POST("/users/login", uc.Login)
 	e.PUT("/users/:id", uc.UpdateUser)
 	e.GET("/users", uc.GetUsers)

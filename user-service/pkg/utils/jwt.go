@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func CreateJWTToken(userID int64, userName string, externalID string, jwtSecretKey string) (string, error) {
+func CreateJWTToken(userID int64, userName string, externalID string, jwtSecretKey string, jwtKid string) (string, error) {
 	claims := jwt.MapClaims{}
 	claims["authorized"] = true
 	claims["userID"] = userID
@@ -16,6 +16,8 @@ func CreateJWTToken(userID int64, userName string, externalID string, jwtSecretK
 	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token.Header["kid"] = jwtKid
+
 	return token.SignedString([]byte(jwtSecretKey))
 }
 

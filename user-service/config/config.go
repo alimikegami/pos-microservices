@@ -5,12 +5,13 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
 	ServicePort      string
 	PostgreSQLConfig PostgreSQLConfig
-	JWTSecret        string
+	JWTConfig        JWTConfig
 	KafkaConfig      KafkaConfig
 }
 
@@ -26,7 +27,10 @@ func CreateNewConfig() *Config {
 			DBUsername: os.Getenv("DB_USERNAME"),
 			DBPassword: os.Getenv("DB_PASSWORD"),
 		},
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		JWTConfig: JWTConfig{
+			JWTSecret: os.Getenv("JWT_SECRET"),
+			JWTKid:    os.Getenv("JWT_KID"),
+		},
 		KafkaConfig: KafkaConfig{
 			BrokerAddress: os.Getenv("BROKER_ADDRESS"),
 			BrokerTopic:   os.Getenv("BROKER_TOPIC"),
@@ -35,6 +39,7 @@ func CreateNewConfig() *Config {
 
 	brokerPartition, err := strconv.Atoi(os.Getenv("BROKER_PARTITION"))
 	if err != nil {
+		log.Error().Err(err).Str("component", "CreateNewConfig").Msg("")
 	}
 
 	conf.KafkaConfig.BrokerPartition = brokerPartition

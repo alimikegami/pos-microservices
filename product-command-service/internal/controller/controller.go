@@ -16,7 +16,7 @@ func CreateProductController(e *echo.Group, service service.ProductService, isLo
 	c := Controller{
 		service: service,
 	}
-	e.POST("/products", c.AddProduct, isLoggedIn)
+	e.POST("/products", c.AddProduct)
 	e.PUT("/products/quantity", c.UpdateProductsQuantity)
 	e.DELETE("/products/:id", c.DeleteProduct)
 	e.PUT("/products/:id", c.UpdateProduct)

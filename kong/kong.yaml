@@ -68,12 +68,35 @@ data:
 
     services:
       - name: user-service
-        url: http://user-service-service/api/v1/users
+        url: http://user-service-service
         routes:
-          - name: user-service-route
-            paths:
-              - /api/v1/users
-            strip_path: true
+        - name: register
+          paths:
+            - /api/v1/users/register
+          strip_path: false
+          methods:
+            - POST
+        - name: login
+          paths:
+            - /api/v1/users/login
+          strip_path: false
+          methods:
+            - POST
+        - name: protected-routes
+          paths:
+            - /api/v1/users
+            - /api/v1/users/~[0-9]+
+          strip_path: false
+          methods:
+            - GET
+            - PUT
+          plugins:
+            - name: jwt
+              config:
+                secret_is_base64: false
+                key_claim_name: kid
+                claims_to_verify:
+                  - exp
       - name: product-query-service
         url: http://product-query-service-service/api/v1/products
         routes:
@@ -81,6 +104,13 @@ data:
             paths:
               - /api/v1/products-query
             strip_path: true
+            plugins:
+            - name: jwt
+              config:
+                secret_is_base64: false
+                key_claim_name: kid
+                claims_to_verify:
+                  - exp
       - name: product-command-service
         url: http://product-command-service-service/api/v1/products
         routes:
@@ -88,6 +118,13 @@ data:
             paths:
               - /api/v1/products-command
             strip_path: true
+            plugins:
+            - name: jwt
+              config:
+                secret_is_base64: false
+                key_claim_name: kid
+                claims_to_verify:
+                  - exp
       - name: order-service
         url: http://order-service-service/api/v1/orders
         routes:
@@ -95,3 +132,17 @@ data:
             paths:
               - /api/v1/orders
             strip_path: true
+            plugins:
+            - name: jwt
+              config:
+                secret_is_base64: false
+                key_claim_name: kid
+                claims_to_verify:
+                  - exp
+    
+    consumers:
+    - username: user
+      jwt_secrets:
+        - key: "user-key" 
+          secret: "1234"
+          algorithm: HS256 

@@ -12,6 +12,7 @@ import (
 	"github.com/alimikegami/e-commerce/user-service/internal/service"
 	"github.com/alimikegami/e-commerce/user-service/pkg/dto"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -29,6 +30,25 @@ func main() {
 
 	e := echo.New()
 	g := e.Group("/api/v1")
+
+	g.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogURI:      true,
+		LogStatus:   true,
+		LogLatency:  true,
+		LogRemoteIP: true,
+		LogMethod:   true,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			logger.Info().
+				Str("method", v.Method).
+				Str("URI", v.URI).
+				Int("status", v.Status).
+				Int64("latency", v.Latency.Microseconds()).
+				Str("remote IP", v.RemoteIP).
+				Msg("Request")
+
+			return nil
+		},
+	}))
 
 	kafkaProducer := kafka.CreateKafkaProducer(config)
 

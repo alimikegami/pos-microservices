@@ -83,7 +83,7 @@ func (s *ServiceImpl) Login(ctx context.Context, payload dto.UserRequest) (respP
 		return respPayload, errs.ErrInvalidCredentialsEmail
 	}
 
-	token, err := utils.CreateJWTToken(user.ID, user.Name, user.ExternalID, s.config.JWTSecret)
+	token, err := utils.CreateJWTToken(user.ID, user.Name, user.ExternalID, s.config.JWTConfig.JWTSecret, s.config.JWTConfig.JWTKid)
 	if err != nil {
 		return
 	}
