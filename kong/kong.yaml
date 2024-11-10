@@ -126,19 +126,29 @@ data:
                 claims_to_verify:
                   - exp
       - name: order-service
-        url: http://order-service-service/api/v1/orders
+        url: http://order-service-service
         routes:
-          - name: order-service-route
+          - name: payment-notification
+            paths:
+              - /api/v1/orders/payments/notifications
+            strip_path: false
+            methods:
+              - POST
+          - name: protected-routes
             paths:
               - /api/v1/orders
-            strip_path: true
+              - /api/v1/orders/~[0-9]+
+            strip_path: false
+            methods:
+              - GET
+              - POST
             plugins:
-            - name: jwt
-              config:
-                secret_is_base64: false
-                key_claim_name: kid
-                claims_to_verify:
-                  - exp
+              - name: jwt
+                config:
+                  secret_is_base64: false
+                  key_claim_name: kid
+                  claims_to_verify:
+                    - exp
     
     consumers:
     - username: user
