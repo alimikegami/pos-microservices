@@ -224,6 +224,8 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			return fmt.Errorf("payment gateway returned non-200 status: %s", response.StatusCode)
 		}
 
+		fmt.Printf("%+v\n", response)
+
 		if strings.ToLower(paymentMethod.Name) == "qris" {
 			orderResponse.QRCode = &response.QRString
 		}
@@ -303,10 +305,19 @@ func (s *OrderServiceImpl) MidtransPaymentWebhook(ctx context.Context, req dto.P
 		return errs.ErrPaymentExpired
 	}
 
-	err = s.repository.UpdateOrderPaymentStatus(ctx, domain.Order{
-		ID:            order.ID,
-		PaymentStatus: "success",
-	})
+	if req.TransactionStatus == "capture" {
+		if req.FraudStatus == "accept" {
+			err = s.repository.UpdateOrderPaymentStatus(ctx, domain.Order{
+				ID:            order.ID,
+				PaymentStatus: "success",
+			})
+		}
+	} else if req.TransactionStatus == "cancel" || req.TransactionStatus == "deny" || req.TransactionStatus == "expire" {
+		err = s.repository.UpdateOrderPaymentStatus(ctx, domain.Order{
+			ID:            order.ID,
+			PaymentStatus: "expired",
+		})
+	}
 
 	return
 }
