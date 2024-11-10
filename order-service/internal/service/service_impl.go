@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/sony/gobreaker/v2"
 
 	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/domain"
@@ -30,15 +31,17 @@ type OrderServiceImpl struct {
 	kafkaReader    *kafka.Reader
 	kafkaProducer  *kafka.Conn
 	config         *config.Config
+	productService *gobreaker.CircuitBreaker[[]byte]
 }
 
-func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn, config *config.Config) OrderService {
+func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn, config *config.Config, productService *gobreaker.CircuitBreaker[[]byte]) OrderService {
 	return &OrderServiceImpl{
 		repository:     repository,
 		midtransClient: midtransClient,
 		kafkaReader:    kafkaReader,
 		kafkaProducer:  kafkaProducer,
 		config:         config,
+		productService: productService,
 	}
 }
 
@@ -75,29 +78,38 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			ProductIds: productIDs,
 		}
 
-		priceInfoJsonBody, err := json.Marshal(priceInfoReq)
+		priceInfoBody, err := s.productService.Execute(func() ([]byte, error) {
+			priceInfoJsonBody, err := json.Marshal(priceInfoReq)
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("")
+				return nil, fmt.Errorf("error marshalling price info request: %v", err)
+			}
+
+			priceInfoHttpReq := httpclient.HttpRequest{
+				URL:    fmt.Sprintf("%s/api/v1/products/prices", s.config.ProductQueryServiceHost),
+				Method: "POST",
+				Body:   priceInfoJsonBody,
+				Headers: map[string]string{
+					"Content-Type": "application/json",
+				},
+			}
+
+			statusCode, priceInfoBody, err := httpclient.SendRequest(priceInfoHttpReq)
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("")
+				return nil, fmt.Errorf("error calling product price info service: %v", err)
+			}
+
+			if statusCode != http.StatusOK {
+				return nil, fmt.Errorf("product price info service returned non-OK status: %d", statusCode)
+			}
+
+			return priceInfoBody, nil
+		})
+
 		if err != nil {
 			log.Error().Err(err).Str("component", "AddOrder").Msg("")
-			return fmt.Errorf("error marshalling price info request: %v", err)
-		}
-
-		priceInfoHttpReq := httpclient.HttpRequest{
-			URL:    fmt.Sprintf("%s/api/v1/products/prices", s.config.ProductQueryServiceHost),
-			Method: "POST",
-			Body:   priceInfoJsonBody,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-		}
-
-		statusCode, priceInfoBody, err := httpclient.SendRequest(priceInfoHttpReq)
-		if err != nil {
-			log.Error().Err(err).Str("component", "AddOrder").Msg("")
-			return fmt.Errorf("error calling product price info service: %v", err)
-		}
-
-		if statusCode != http.StatusOK {
-			return fmt.Errorf("product price info service returned non-OK status: %d", statusCode)
+			return err
 		}
 
 		// Parse the price info response
@@ -107,29 +119,38 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			return fmt.Errorf("error unmarshalling price info response: %v", err)
 		}
 
-		productReqPayloadJson, err := json.Marshal(productReqPayload)
+		_, err = s.productService.Execute(func() ([]byte, error) {
+			productReqPayloadJson, err := json.Marshal(productReqPayload)
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("")
+				return nil, fmt.Errorf("error marshalling price info request: %v", err)
+			}
+
+			updateProductStock := httpclient.HttpRequest{
+				URL:    fmt.Sprintf("%s/api/v1/products/quantity", s.config.ProductCommandServiceHost),
+				Method: "PUT",
+				Body:   productReqPayloadJson,
+				Headers: map[string]string{
+					"Content-Type": "application/json",
+				},
+			}
+
+			statusCode, _, err := httpclient.SendRequest(updateProductStock)
+			if err != nil {
+				return nil, fmt.Errorf("error calling product price info service: %v", err)
+			}
+
+			if statusCode != 200 {
+				log.Info().Msg(fmt.Sprintf("%d", statusCode))
+				return nil, errs.ErrInternalServer
+			}
+
+			return nil, nil
+		})
+
 		if err != nil {
 			log.Error().Err(err).Str("component", "AddOrder").Msg("")
-			return fmt.Errorf("error marshalling price info request: %v", err)
-		}
-
-		updateProductStock := httpclient.HttpRequest{
-			URL:    fmt.Sprintf("%s/api/v1/products/quantity", s.config.ProductCommandServiceHost),
-			Method: "PUT",
-			Body:   productReqPayloadJson,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-		}
-
-		statusCode, _, err = httpclient.SendRequest(updateProductStock)
-		if err != nil {
-			return fmt.Errorf("error calling product price info service: %v", err)
-		}
-
-		if statusCode != 200 {
-			log.Info().Msg(fmt.Sprintf("%d", statusCode))
-			return errs.ErrInternalServer
+			return err
 		}
 
 		restoreProductMsg := dto.KafkaMessage{
@@ -196,6 +217,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		if strings.ToLower(paymentMethod.Name) == "qris" {
 			paymentType = coreapi.PaymentTypeQris
 		}
+
 		chargeReq := &coreapi.ChargeReq{
 			PaymentType: paymentType,
 			TransactionDetails: midtrans.TransactionDetails{
@@ -305,7 +327,8 @@ func (s *OrderServiceImpl) MidtransPaymentWebhook(ctx context.Context, req dto.P
 		return errs.ErrPaymentExpired
 	}
 
-	if req.TransactionStatus == "capture" {
+	fmt.Printf("%+v\n", req)
+	if req.TransactionStatus == "settlement" {
 		if req.FraudStatus == "accept" {
 			err = s.repository.UpdateOrderPaymentStatus(ctx, domain.Order{
 				ID:            order.ID,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/controller"
+	circuitbreaker "github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/circuit-breaker"
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/database/postgres"
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/message-queue/kafka"
 	paymentgateway "github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/payment-gateway"
@@ -57,12 +58,33 @@ func main() {
 	e := echo.New()
 	g := e.Group("/api/v1")
 
+	g.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogURI:      true,
+		LogStatus:   true,
+		LogLatency:  true,
+		LogRemoteIP: true,
+		LogMethod:   true,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			logger.Info().
+				Str("method", v.Method).
+				Str("URI", v.URI).
+				Int("status", v.Status).
+				Int64("latency", v.Latency.Microseconds()).
+				Str("remote IP", v.RemoteIP).
+				Msg("Request")
+
+			return nil
+		},
+	}))
+
 	g.GET("/ping", func(c echo.Context) error {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
+	cb := circuitbreaker.CreateCircuitBreaker("product-service")
+
 	orderRepo := repository.CreateOrderRepository(db)
-	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer, config)
+	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer, config, cb)
 	controller.CreateOrderController(g, orderSvc, IsLoggedIn)
 	s, err := gocron.NewScheduler()
 	if err != nil {
