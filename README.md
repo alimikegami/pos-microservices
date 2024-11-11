@@ -6,7 +6,7 @@ This is a work-in-progress side project, serving as an experimental playground t
 The microservices in this project communicate via RESTful APIs and message queues.
 
 ## API Gateway
-Kong (DB-less) is used as the API gateway for routing and load balancing.
+Kong (DB-less) is used as the API gateway for routing.
 
 ## Services
 
