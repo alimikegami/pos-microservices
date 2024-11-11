@@ -17,4 +17,4 @@ This service manages user accounts and authentication. It’s built with Go and 
 This service handles product and inventory management, implemented with Go, MongoDB, Elasticsearch, and Kafka. It follows the CQRS (Command Query Responsibility Segregation) pattern.
 
 ### Order Service
-This service is responsible for order management and payment processing, integrated with the Midtrans payment gateway (currently in sandbox mode). It’s built with Go, PostgreSQL, and Kafka.
+This service is responsible for order management and payment processing, integrated with the Midtrans payment gateway (currently in sandbox mode). It’s built with Go, PostgreSQL, and Kafka and includes a circuit breaker for enhanced reliability during external service calls. 
