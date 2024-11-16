@@ -4,6 +4,7 @@ This is a work-in-progress side project, serving as an experimental playground t
 
 ## Architecture Overview
 The microservices in this project communicate via RESTful APIs and message queues.
+
 ![Architecture](./assets/architecture.png)
 
 ## API Gateway
