@@ -15,7 +15,7 @@ type Controller struct {
 	service service.OrderService
 }
 
-func CreateOrderController(e *echo.Group, service service.OrderService, isLoggedIn echo.MiddlewareFunc) {
+func CreateOrderController(e *echo.Group, service service.OrderService) {
 	c := Controller{
 		service: service,
 	}

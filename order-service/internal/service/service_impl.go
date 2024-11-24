@@ -94,7 +94,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 				},
 			}
 
-			statusCode, priceInfoBody, err := httpclient.SendRequest(priceInfoHttpReq)
+			statusCode, priceInfoBody, err := httpclient.SendRequest(ctx, priceInfoHttpReq)
 			if err != nil {
 				log.Error().Err(err).Str("component", "AddOrder").Msg("")
 				return nil, fmt.Errorf("error calling product price info service: %v", err)
@@ -135,7 +135,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 				},
 			}
 
-			statusCode, _, err := httpclient.SendRequest(updateProductStock)
+			statusCode, _, err := httpclient.SendRequest(ctx, updateProductStock)
 			if err != nil {
 				return nil, fmt.Errorf("error calling product price info service: %v", err)
 			}

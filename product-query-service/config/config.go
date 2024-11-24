@@ -12,6 +12,7 @@ type Config struct {
 	KafkaConfig         KafkaConfig
 	ElasticsearchConfig ElasticsearchConfig
 	JWTSecret           string
+	TracingConfig       TracingConfig
 }
 
 func CreateNewConfig() *Config {
@@ -26,6 +27,9 @@ func CreateNewConfig() *Config {
 		},
 		ElasticsearchConfig: ElasticsearchConfig{
 			DBHost: os.Getenv("ELASTIC_SEARCH_HOST"),
+		},
+		TracingConfig: TracingConfig{
+			CollectorHost: os.Getenv("COLLECTOR_HOST"),
 		},
 	}
 

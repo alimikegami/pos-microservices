@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"time"
 
@@ -14,6 +14,7 @@ import (
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/database/postgres"
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/message-queue/kafka"
 	paymentgateway "github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/payment-gateway"
+	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/tracing"
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/dto"
@@ -41,24 +42,37 @@ func main() {
 		panic(err)
 	}
 
-	IsLoggedIn := middleware.JWTWithConfig(middleware.JWTConfig{
-		SigningKey: []byte(config.JWTSecret),
-		ErrorHandlerWithContext: func(err error, c echo.Context) error {
-			// Custom logic to handle JWT validation errors
-			// Return a custom JSON response
-			errorResponse := map[string]interface{}{
-				"status":  "error",
-				"message": "Invalid or expired JWT",
-				"errors":  nil,
-			}
-			return c.JSON(http.StatusUnauthorized, errorResponse)
-		},
-	})
+	traceProvider, err := tracing.InitTracing(config.TracingConfig.CollectorHost)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer func() {
+		if err := traceProvider.Shutdown(context.Background()); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	tracer := traceProvider.Tracer("pos-order-service")
 
 	e := echo.New()
 	g := e.Group("/api/v1")
 
-	g.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// span creation and naming
+			ctx, span := tracer.Start(c.Request().Context(), fmt.Sprintf("[%s] %s", c.Request().Method, c.Path()))
+			defer span.End()
+
+			// add the context to the request
+			req := c.Request()
+			c.SetRequest(req.WithContext(ctx))
+
+			return next(c)
+		}
+	})
+
+	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogURI:      true,
 		LogStatus:   true,
 		LogLatency:  true,
@@ -81,11 +95,11 @@ func main() {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
-	cb := circuitbreaker.CreateCircuitBreaker("product-service")
+	cb := circuitbreaker.CreateCircuitBreaker("order-service")
 
 	orderRepo := repository.CreateOrderRepository(db)
 	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer, config, cb)
-	controller.CreateOrderController(g, orderSvc, IsLoggedIn)
+	controller.CreateOrderController(g, orderSvc)
 	s, err := gocron.NewScheduler()
 	if err != nil {
 		panic(err)

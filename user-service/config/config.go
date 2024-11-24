@@ -13,6 +13,7 @@ type Config struct {
 	PostgreSQLConfig PostgreSQLConfig
 	JWTConfig        JWTConfig
 	KafkaConfig      KafkaConfig
+	TracingConfig    TracingConfig
 }
 
 func CreateNewConfig() *Config {
@@ -34,6 +35,9 @@ func CreateNewConfig() *Config {
 		KafkaConfig: KafkaConfig{
 			BrokerAddress: os.Getenv("BROKER_ADDRESS"),
 			BrokerTopic:   os.Getenv("BROKER_TOPIC"),
+		},
+		TracingConfig: TracingConfig{
+			CollectorHost: os.Getenv("COLLECTOR_HOST"),
 		},
 	}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/alimikegami/e-commerce/user-service/internal/controller"
 	postgresDriver "github.com/alimikegami/e-commerce/user-service/internal/infrastructure/database/postgres"
 	"github.com/alimikegami/e-commerce/user-service/internal/infrastructure/message-queue/kafka"
+	"github.com/alimikegami/e-commerce/user-service/internal/infrastructure/tracing"
 	"github.com/alimikegami/e-commerce/user-service/internal/repository"
 	"github.com/alimikegami/e-commerce/user-service/internal/service"
 	"github.com/alimikegami/e-commerce/user-service/pkg/dto"
@@ -29,6 +31,33 @@ func main() {
 	}
 
 	e := echo.New()
+	traceProvider, err := tracing.InitTracing(config.TracingConfig.CollectorHost)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer func() {
+		if err := traceProvider.Shutdown(context.Background()); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	tracer := traceProvider.Tracer("user-service")
+
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// span creation and naming
+			ctx, span := tracer.Start(c.Request().Context(), fmt.Sprintf("[%s] %s", c.Request().Method, c.Path()))
+			defer span.End()
+
+			// add the context to the request
+			req := c.Request()
+			c.SetRequest(req.WithContext(ctx))
+
+			return next(c)
+		}
+	})
+
 	g := e.Group("/api/v1")
 
 	g.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{

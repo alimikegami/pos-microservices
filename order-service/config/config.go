@@ -14,6 +14,7 @@ type Config struct {
 	KafkaConfig               KafkaConfig
 	ProductQueryServiceHost   string
 	ProductCommandServiceHost string
+	TracingConfig             TracingConfig
 }
 
 func CreateNewConfig() *Config {
@@ -38,6 +39,9 @@ func CreateNewConfig() *Config {
 		},
 		ProductQueryServiceHost:   os.Getenv("PRODUCT_QUERY_SERVICE_HOST"),
 		ProductCommandServiceHost: os.Getenv("PRODUCT_COMMAND_SERVICE_HOST"),
+		TracingConfig: TracingConfig{
+			CollectorHost: os.Getenv("COLLECTOR_HOST"),
+		},
 	}
 
 	return &conf

@@ -2,10 +2,13 @@ package httpclient
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // HttpRequest is a struct to hold request parameters
@@ -17,9 +20,10 @@ type HttpRequest struct {
 }
 
 // SendRequest sends an HTTP request based on the given HttpRequest struct
-func SendRequest(req HttpRequest) (int, []byte, error) {
+func SendRequest(ctx context.Context, req HttpRequest) (int, []byte, error) {
 	// Create the HTTP request
-	request, err := http.NewRequest(req.Method, req.URL, bytes.NewBuffer(req.Body))
+
+	request, err := http.NewRequestWithContext(ctx, req.Method, req.URL, bytes.NewBuffer(req.Body))
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -30,7 +34,7 @@ func SendRequest(req HttpRequest) (int, []byte, error) {
 	}
 
 	// Create an HTTP client with a timeout
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Second, Transport: otelhttp.NewTransport(http.DefaultTransport)}
 
 	// Send the request
 	response, err := client.Do(request)

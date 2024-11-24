@@ -8,6 +8,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 func ConnectToMongoDB(host, port string) (*mongo.Database, error) {
@@ -23,6 +24,8 @@ func ConnectToMongoDB(host, port string) (*mongo.Database, error) {
 		SetServerSelectionTimeout(20 * time.Second).
 		SetConnectTimeout(20 * time.Second).
 		SetDirect(false)
+
+	clientOptions.Monitor = otelmongo.NewMonitor()
 
 	// Create context with longer timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
