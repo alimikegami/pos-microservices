@@ -20,3 +20,8 @@ This service handles product and inventory management, implemented with Go, Mong
 
 ### Order Service
 This service is responsible for order management and payment processing, integrated with the Midtrans payment gateway (currently in sandbox mode). It’s built with Go, PostgreSQL, and Kafka and includes a circuit breaker for enhanced reliability during external service calls. 
+
+
+## Observability
+### Traces
+All services use OpenTelemetry to generate distributed traces, which are collected and visualized in Jaeger
