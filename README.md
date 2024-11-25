@@ -24,4 +24,4 @@ This service is responsible for order management and payment processing, integra
 
 ## Observability
 ### Traces
-All services use OpenTelemetry to generate distributed traces, which are collected and visualized in Jaeger
+All services use OpenTelemetry to generate traces, which are collected and visualized in Jaeger
