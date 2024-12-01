@@ -3,7 +3,7 @@ package kafka
 import (
 	"context"
 
-	"github.com/alimikegami/e-commerce/user-service/config"
+	"github.com/alimikegami/pos-microservices/user-service/config"
 	"github.com/segmentio/kafka-go"
 )
 

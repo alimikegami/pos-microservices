@@ -2,20 +2,17 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/alimikegami/e-commerce/user-service/config"
-	"github.com/alimikegami/e-commerce/user-service/internal/domain"
-	"github.com/alimikegami/e-commerce/user-service/internal/dto"
-	"github.com/alimikegami/e-commerce/user-service/internal/repository"
-	pkgdto "github.com/alimikegami/e-commerce/user-service/pkg/dto"
-	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
-	"github.com/alimikegami/e-commerce/user-service/pkg/utils"
+	"github.com/alimikegami/pos-microservices/user-service/config"
+	"github.com/alimikegami/pos-microservices/user-service/internal/domain"
+	"github.com/alimikegami/pos-microservices/user-service/internal/dto"
+	"github.com/alimikegami/pos-microservices/user-service/internal/repository"
+	pkgdto "github.com/alimikegami/pos-microservices/user-service/pkg/dto"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/errs"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/utils"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog/log"
-	"github.com/segmentio/kafka-go"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -27,13 +24,12 @@ type UserService interface {
 }
 
 type ServiceImpl struct {
-	repo          repository.UserRepository
-	config        config.Config
-	kafkaProducer *kafka.Conn
+	repo   repository.UserRepository
+	config config.Config
 }
 
-func CreateNewService(repo repository.UserRepository, config config.Config, kafkaProducer *kafka.Conn) UserService {
-	return &ServiceImpl{repo: repo, config: config, kafkaProducer: kafkaProducer}
+func CreateNewService(repo repository.UserRepository, config config.Config) UserService {
+	return &ServiceImpl{repo: repo, config: config}
 }
 
 func (s *ServiceImpl) AddUser(ctx context.Context, data dto.UserRequest) (err error) {
@@ -120,34 +116,6 @@ func (s *ServiceImpl) UpdateUser(ctx context.Context, payload dto.UserRequest) e
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
-	kafkaMsg := dto.KafkaMessage{
-		EventType: "user_update",
-		Data: dto.UserResponse{
-			ExternalID: userData.ExternalID,
-			Name:       payload.Name,
-		},
-	}
-
-	jsonMsg, err := json.Marshal(kafkaMsg)
-	if err != nil {
-		return fmt.Errorf("failed to marshal Kafka message: %w", err)
-	}
-
-	// Implement retry logic for Kafka producer
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		err = s.writeKafkaMessage(jsonMsg)
-		if err == nil {
-			break
-		}
-		log.Printf("Failed to write Kafka message (attempt %d/%d): %v", i+1, maxRetries, err)
-		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to write Kafka message after %d attempts: %w", maxRetries, err)
-	}
-
 	return nil
 }
 
@@ -179,13 +147,4 @@ func (s *ServiceImpl) GetUsers(ctx context.Context, filter pkgdto.Filter) (resp 
 	resp.Metadata.TotalCount = uint64(userCount)
 
 	return
-}
-
-func (s *ServiceImpl) writeKafkaMessage(msg []byte) error {
-	_, err := s.kafkaProducer.WriteMessages(
-		kafka.Message{
-			Value: msg,
-		},
-	)
-	return err
 }

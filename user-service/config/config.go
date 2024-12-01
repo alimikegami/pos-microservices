@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	Environment      string
 	ServicePort      string
 	PostgreSQLConfig PostgreSQLConfig
 	JWTConfig        JWTConfig
@@ -17,7 +18,16 @@ type Config struct {
 }
 
 func CreateNewConfig() *Config {
-	godotenv.Load(".env")
+	possiblePaths := []string{
+		".env",
+		"../.env",
+	}
+
+	for _, path := range possiblePaths {
+		if err := godotenv.Load(path); err == nil {
+			break
+		}
+	}
 
 	conf := Config{
 		ServicePort: os.Getenv("SERVICE_PORT"),

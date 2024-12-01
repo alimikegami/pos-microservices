@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/alimikegami/e-commerce/user-service/internal/domain"
-	pkgdto "github.com/alimikegami/e-commerce/user-service/pkg/dto"
-	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
+	"github.com/alimikegami/pos-microservices/user-service/internal/domain"
+	pkgdto "github.com/alimikegami/pos-microservices/user-service/pkg/dto"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/errs"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )

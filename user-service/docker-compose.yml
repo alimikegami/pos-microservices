@@ -1,0 +1,11 @@
+# docker-compose.test.yml
+version: '3'
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres  # Explicitly set the user
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5433:5432"

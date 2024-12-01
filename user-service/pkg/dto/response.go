@@ -3,7 +3,7 @@ package dto
 import (
 	"net/http"
 
-	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/errs"
 	"github.com/labstack/echo/v4"
 )
 

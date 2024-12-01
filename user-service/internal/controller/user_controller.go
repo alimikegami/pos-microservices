@@ -1,13 +1,14 @@
 package controller
 
 import (
+	"net/http"
 	"strconv"
 
-	"github.com/alimikegami/e-commerce/user-service/internal/dto"
-	"github.com/alimikegami/e-commerce/user-service/internal/service"
-	pkgdto "github.com/alimikegami/e-commerce/user-service/pkg/dto"
-	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
-	"github.com/alimikegami/e-commerce/user-service/pkg/response"
+	"github.com/alimikegami/pos-microservices/user-service/internal/dto"
+	"github.com/alimikegami/pos-microservices/user-service/internal/service"
+	pkgdto "github.com/alimikegami/pos-microservices/user-service/pkg/dto"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/errs"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/response"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 )
@@ -39,7 +40,7 @@ func (c *Controller) AddUser(e echo.Context) error {
 		return response.WriteErrorResponse(e, err, nil)
 	}
 
-	return response.WriteSuccessResponse(e, "", nil)
+	return response.WriteSuccessResponse(e, "", http.StatusCreated, nil)
 }
 
 func (c *Controller) Login(e echo.Context) error {
@@ -55,7 +56,7 @@ func (c *Controller) Login(e echo.Context) error {
 		return response.WriteErrorResponse(e, err, nil)
 	}
 
-	return response.WriteSuccessResponse(e, "", respPayload)
+	return response.WriteSuccessResponse(e, "", http.StatusOK, respPayload)
 }
 
 func (c *Controller) UpdateUser(e echo.Context) error {
@@ -77,7 +78,7 @@ func (c *Controller) UpdateUser(e echo.Context) error {
 		return response.WriteErrorResponse(e, err, nil)
 	}
 
-	return response.WriteSuccessResponse(e, "", nil)
+	return response.WriteSuccessResponse(e, "", http.StatusOK, nil)
 }
 
 func (c *Controller) GetUsers(e echo.Context) error {
@@ -92,5 +93,5 @@ func (c *Controller) GetUsers(e echo.Context) error {
 		return response.WriteErrorResponse(e, err, nil)
 	}
 
-	return response.WriteSuccessResponse(e, "", resp)
+	return response.WriteSuccessResponse(e, "", http.StatusOK, resp)
 }

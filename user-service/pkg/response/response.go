@@ -1,9 +1,7 @@
 package response
 
 import (
-	"net/http"
-
-	"github.com/alimikegami/e-commerce/user-service/pkg/errs"
+	"github.com/alimikegami/pos-microservices/user-service/pkg/errs"
 	"github.com/labstack/echo/v4"
 )
 
@@ -24,13 +22,13 @@ type ErrorResponse struct {
 	Errors  interface{} `json:"errors"`
 }
 
-func WriteSuccessResponse(c echo.Context, message string, data interface{}) error {
+func WriteSuccessResponse(c echo.Context, message string, status int, data interface{}) error {
 	resp := SuccessResponse{}
 	resp.Status = "success"
 	resp.Data = data
 	resp.Message = message
 
-	return c.JSON(http.StatusOK, resp)
+	return c.JSON(status, resp)
 }
 
 func WriteErrorResponse(c echo.Context, err error, errors interface{}) error {
