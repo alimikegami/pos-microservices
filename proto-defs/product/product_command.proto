@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package product_command;
+
+option go_package = "github.com/alimikegami/pos-microservices/product-command-service/pb";
+
+import "google/protobuf/empty.proto";
+
+service ProductCommandService {
+  rpc UpdateProductQuantity(UpdateProductQuantityRequest) returns (google.protobuf.Empty);
+}
+
+service ProductQueryService {
+  rpc GetProductPriceInfo(ProductPriceInfoRequest) returns (ProductPriceInfoResponse);
+}
+
+message Product {
+  string product_id = 1;
+  int64 quantity = 2;
+  string name = 3;
+  float price = 4;
+  string description = 5;
+}
+
+message UpdateProductQuantityRequest {
+  repeated Product products = 1;
+}
+
+message ProductPriceInfoRequest {
+  repeated string product_ids = 1;
+}
+
+message ProductPriceInfoResponse {
+  repeated Product products = 1;
+}
