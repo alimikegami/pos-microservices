@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package product_command;
+package product;
 
 option go_package = "github.com/alimikegami/pos-microservices/product-command-service/pb";
 

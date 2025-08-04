@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.28.3
-// source: product_command.proto
+// source: product.proto
 
 package pb
 
@@ -20,7 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProductCommandService_UpdateProductQuantity_FullMethodName = "/product_command.ProductCommandService/UpdateProductQuantity"
+	ProductCommandService_UpdateProductQuantity_FullMethodName = "/product.ProductCommandService/UpdateProductQuantity"
 )
 
 // ProductCommandServiceClient is the client API for ProductCommandService service.
@@ -109,7 +109,7 @@ func _ProductCommandService_UpdateProductQuantity_Handler(srv interface{}, ctx c
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ProductCommandService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "product_command.ProductCommandService",
+	ServiceName: "product.ProductCommandService",
 	HandlerType: (*ProductCommandServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -118,11 +118,11 @@ var ProductCommandService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "product_command.proto",
+	Metadata: "product.proto",
 }
 
 const (
-	ProductQueryService_GetProductPriceInfo_FullMethodName = "/product_command.ProductQueryService/GetProductPriceInfo"
+	ProductQueryService_GetProductPriceInfo_FullMethodName = "/product.ProductQueryService/GetProductPriceInfo"
 )
 
 // ProductQueryServiceClient is the client API for ProductQueryService service.
@@ -211,7 +211,7 @@ func _ProductQueryService_GetProductPriceInfo_Handler(srv interface{}, ctx conte
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ProductQueryService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "product_command.ProductQueryService",
+	ServiceName: "product.ProductQueryService",
 	HandlerType: (*ProductQueryServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -220,5 +220,5 @@ var ProductQueryService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "product_command.proto",
+	Metadata: "product.proto",
 }
