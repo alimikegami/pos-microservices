@@ -20,14 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProductCommandService_UpdateProductQuantity_FullMethodName = "/product.ProductCommandService/UpdateProductQuantity"
+	ProductCommandService_UpdateProductQuantityBatch_FullMethodName = "/product.ProductCommandService/UpdateProductQuantityBatch"
 )
 
 // ProductCommandServiceClient is the client API for ProductCommandService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductCommandServiceClient interface {
-	UpdateProductQuantity(ctx context.Context, in *UpdateProductQuantityRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	UpdateProductQuantityBatch(ctx context.Context, in *UpdateProductQuantityRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type productCommandServiceClient struct {
@@ -38,10 +38,10 @@ func NewProductCommandServiceClient(cc grpc.ClientConnInterface) ProductCommandS
 	return &productCommandServiceClient{cc}
 }
 
-func (c *productCommandServiceClient) UpdateProductQuantity(ctx context.Context, in *UpdateProductQuantityRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *productCommandServiceClient) UpdateProductQuantityBatch(ctx context.Context, in *UpdateProductQuantityRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, ProductCommandService_UpdateProductQuantity_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ProductCommandService_UpdateProductQuantityBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (c *productCommandServiceClient) UpdateProductQuantity(ctx context.Context,
 // All implementations must embed UnimplementedProductCommandServiceServer
 // for forward compatibility.
 type ProductCommandServiceServer interface {
-	UpdateProductQuantity(context.Context, *UpdateProductQuantityRequest) (*emptypb.Empty, error)
+	UpdateProductQuantityBatch(context.Context, *UpdateProductQuantityRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedProductCommandServiceServer()
 }
 
@@ -63,8 +63,8 @@ type ProductCommandServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedProductCommandServiceServer struct{}
 
-func (UnimplementedProductCommandServiceServer) UpdateProductQuantity(context.Context, *UpdateProductQuantityRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateProductQuantity not implemented")
+func (UnimplementedProductCommandServiceServer) UpdateProductQuantityBatch(context.Context, *UpdateProductQuantityRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProductQuantityBatch not implemented")
 }
 func (UnimplementedProductCommandServiceServer) mustEmbedUnimplementedProductCommandServiceServer() {}
 func (UnimplementedProductCommandServiceServer) testEmbeddedByValue()                               {}
@@ -87,20 +87,20 @@ func RegisterProductCommandServiceServer(s grpc.ServiceRegistrar, srv ProductCom
 	s.RegisterService(&ProductCommandService_ServiceDesc, srv)
 }
 
-func _ProductCommandService_UpdateProductQuantity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ProductCommandService_UpdateProductQuantityBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateProductQuantityRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ProductCommandServiceServer).UpdateProductQuantity(ctx, in)
+		return srv.(ProductCommandServiceServer).UpdateProductQuantityBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ProductCommandService_UpdateProductQuantity_FullMethodName,
+		FullMethod: ProductCommandService_UpdateProductQuantityBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductCommandServiceServer).UpdateProductQuantity(ctx, req.(*UpdateProductQuantityRequest))
+		return srv.(ProductCommandServiceServer).UpdateProductQuantityBatch(ctx, req.(*UpdateProductQuantityRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -113,8 +113,8 @@ var ProductCommandService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ProductCommandServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "UpdateProductQuantity",
-			Handler:    _ProductCommandService_UpdateProductQuantity_Handler,
+			MethodName: "UpdateProductQuantityBatch",
+			Handler:    _ProductCommandService_UpdateProductQuantityBatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -122,14 +122,14 @@ var ProductCommandService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ProductQueryService_GetProductPriceInfo_FullMethodName = "/product.ProductQueryService/GetProductPriceInfo"
+	ProductQueryService_GetProductPrice_FullMethodName = "/product.ProductQueryService/GetProductPrice"
 )
 
 // ProductQueryServiceClient is the client API for ProductQueryService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductQueryServiceClient interface {
-	GetProductPriceInfo(ctx context.Context, in *ProductPriceInfoRequest, opts ...grpc.CallOption) (*ProductPriceInfoResponse, error)
+	GetProductPrice(ctx context.Context, in *GetProductPriceRequest, opts ...grpc.CallOption) (*ProductPriceResponse, error)
 }
 
 type productQueryServiceClient struct {
@@ -140,10 +140,10 @@ func NewProductQueryServiceClient(cc grpc.ClientConnInterface) ProductQueryServi
 	return &productQueryServiceClient{cc}
 }
 
-func (c *productQueryServiceClient) GetProductPriceInfo(ctx context.Context, in *ProductPriceInfoRequest, opts ...grpc.CallOption) (*ProductPriceInfoResponse, error) {
+func (c *productQueryServiceClient) GetProductPrice(ctx context.Context, in *GetProductPriceRequest, opts ...grpc.CallOption) (*ProductPriceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ProductPriceInfoResponse)
-	err := c.cc.Invoke(ctx, ProductQueryService_GetProductPriceInfo_FullMethodName, in, out, cOpts...)
+	out := new(ProductPriceResponse)
+	err := c.cc.Invoke(ctx, ProductQueryService_GetProductPrice_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (c *productQueryServiceClient) GetProductPriceInfo(ctx context.Context, in 
 // All implementations must embed UnimplementedProductQueryServiceServer
 // for forward compatibility.
 type ProductQueryServiceServer interface {
-	GetProductPriceInfo(context.Context, *ProductPriceInfoRequest) (*ProductPriceInfoResponse, error)
+	GetProductPrice(context.Context, *GetProductPriceRequest) (*ProductPriceResponse, error)
 	mustEmbedUnimplementedProductQueryServiceServer()
 }
 
@@ -165,8 +165,8 @@ type ProductQueryServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedProductQueryServiceServer struct{}
 
-func (UnimplementedProductQueryServiceServer) GetProductPriceInfo(context.Context, *ProductPriceInfoRequest) (*ProductPriceInfoResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetProductPriceInfo not implemented")
+func (UnimplementedProductQueryServiceServer) GetProductPrice(context.Context, *GetProductPriceRequest) (*ProductPriceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProductPrice not implemented")
 }
 func (UnimplementedProductQueryServiceServer) mustEmbedUnimplementedProductQueryServiceServer() {}
 func (UnimplementedProductQueryServiceServer) testEmbeddedByValue()                             {}
@@ -189,20 +189,20 @@ func RegisterProductQueryServiceServer(s grpc.ServiceRegistrar, srv ProductQuery
 	s.RegisterService(&ProductQueryService_ServiceDesc, srv)
 }
 
-func _ProductQueryService_GetProductPriceInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ProductPriceInfoRequest)
+func _ProductQueryService_GetProductPrice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductPriceRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ProductQueryServiceServer).GetProductPriceInfo(ctx, in)
+		return srv.(ProductQueryServiceServer).GetProductPrice(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ProductQueryService_GetProductPriceInfo_FullMethodName,
+		FullMethod: ProductQueryService_GetProductPrice_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductQueryServiceServer).GetProductPriceInfo(ctx, req.(*ProductPriceInfoRequest))
+		return srv.(ProductQueryServiceServer).GetProductPrice(ctx, req.(*GetProductPriceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -215,8 +215,8 @@ var ProductQueryService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ProductQueryServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetProductPriceInfo",
-			Handler:    _ProductQueryService_GetProductPriceInfo_Handler,
+			MethodName: "GetProductPrice",
+			Handler:    _ProductQueryService_GetProductPrice_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

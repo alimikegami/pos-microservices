@@ -7,11 +7,11 @@ option go_package = "github.com/alimikegami/pos-microservices/product-command-se
 import "google/protobuf/empty.proto";
 
 service ProductCommandService {
-  rpc UpdateProductQuantity(UpdateProductQuantityRequest) returns (google.protobuf.Empty);
+  rpc UpdateProductQuantityBatch(UpdateProductQuantityRequest) returns (google.protobuf.Empty);
 }
 
 service ProductQueryService {
-  rpc GetProductPriceInfo(ProductPriceInfoRequest) returns (ProductPriceInfoResponse);
+  rpc GetProductPrice(GetProductPriceRequest) returns (ProductPriceResponse);
 }
 
 message Product {
@@ -22,14 +22,19 @@ message Product {
   string description = 5;
 }
 
-message UpdateProductQuantityRequest {
-  repeated Product products = 1;
+message ProductQuantityUpdate {
+  string product_id = 1;
+  int64 quantity = 2;
 }
 
-message ProductPriceInfoRequest {
+message UpdateProductQuantityRequest {
+  repeated ProductQuantityUpdate products = 1;
+}
+
+message GetProductPriceRequest {
   repeated string product_ids = 1;
 }
 
-message ProductPriceInfoResponse {
+message ProductPriceResponse {
   repeated Product products = 1;
 }
