@@ -3,20 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
 	"github.com/alimikegami/point-of-sales/product-query-service/config"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/controller"
+	"github.com/alimikegami/point-of-sales/product-query-service/internal/handler"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/infrastructure/message-queue/kafka"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/infrastructure/tracing"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/service"
 	"github.com/alimikegami/point-of-sales/product-query-service/pkg/dto"
+	pb "github.com/alimikegami/pos-microservices/proto-defs/pb"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -80,6 +84,22 @@ func main() {
 	g.GET("/ping", func(c echo.Context) error {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
+
+	srv := grpc.NewServer()
+	productGrpcServer := handler.CreateGRPCHandler(svc)
+	pb.RegisterProductQueryServiceServer(srv, productGrpcServer)
+
+	go func() {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%s", config.GrpcServicePort))
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to listen on port 50051")
+			return
+		}
+		log.Info().Msg("gRPC server started on port 50051")
+		if err := srv.Serve(lis); err != nil {
+			log.Error().Err(err).Msg("Failed to serve gRPC server")
+		}
+	}()
 
 	go svc.ConsumeEvent()
 

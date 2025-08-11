@@ -1,7 +1,24 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+spec:
+  clusterIP: None  # headless service
+  selector:
+    app: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mongodb
+  labels:
+    app: mongodb
 spec:
   serviceName: mongodb
   replicas: 3
@@ -16,21 +33,60 @@ spec:
       containers:
       - name: mongodb
         image: mongo:6.0
-        command: 
-        - mongod
-        - "--replSet"
-        - "rs0"
-        - "--bind_ip_all"
+        command: ["mongod","--replSet","rs0","--bind_ip_all"]
         ports:
-        - containerPort: 27017
+          - containerPort: 27017
         volumeMounts:
-        - name: mongodb-data
-          mountPath: /data/db
+          - name: mongodb-data
+            mountPath: /data/db
+        readinessProbe:
+          exec:
+            command:
+              - bash
+              - -lc
+              - |
+                mongosh --quiet --eval 'var h=db.hello(); (h.isWritablePrimary || h.secondary) ? 0 : (printjson(h), 1)'
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      - name: rs-init
+        image: mongo:6.0
+        command: ["/bin/bash","-lc"]
+        args:
+          - |
+            if [[ "$(hostname)" != "mongodb-0" ]]; then
+              # Only first pod performs init/reconfig; others just idle
+              sleep infinity
+            fi
+
+            # Wait for MongoDB to be ready
+            until mongosh --quiet --host localhost --eval "db.adminCommand('ping').ok" > /dev/null 2>&1; do
+              echo "Waiting for mongod..."
+              sleep 2
+            done
+
+            NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+            CFG='{"_id":"rs0","members":[
+              {"_id":0,"host":"mongodb-0.mongodb.'$NS'.svc.cluster.local:27017"},
+              {"_id":1,"host":"mongodb-1.mongodb.'$NS'.svc.cluster.local:27017"},
+              {"_id":2,"host":"mongodb-2.mongodb.'$NS'.svc.cluster.local:27017"}]}'
+
+            if [[ "$(mongosh --quiet --eval 'db.getSiblingDB(\"local\").system.replset.countDocuments()')" == "0" ]]; then
+              echo "Initializing replica set..."
+              mongosh --quiet --eval "rs.initiate($CFG)"
+            else
+              echo "Replica set exists; ensuring config is correct..."
+              mongosh --quiet --eval "cfg=$CFG; try{cfg.version=(rs.conf().version||1)+1; rs.reconfig(cfg,{force:true})}catch(e){print(e)}"
+            fi
+
+            echo "Replica set configuration complete."
+            sleep infinity
+
   volumeClaimTemplates:
   - metadata:
       name: mongodb-data
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes: ["ReadWriteOnce"]
       resources:
         requests:
           storage: 1Gi

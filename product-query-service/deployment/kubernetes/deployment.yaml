@@ -23,3 +23,8 @@ spec:
             name:  product-query-service-config
         ports:
         - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 50051
+          name: grpc
+          protocol: TCP

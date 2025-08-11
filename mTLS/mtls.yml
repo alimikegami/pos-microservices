@@ -1,0 +1,59 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: kong-external-access
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: kong
+  mtls:
+    mode: PERMISSIVE
+
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: product-command-service-mtls
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: product-command-service
+  mtls:
+    mode: STRICT
+
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: product-query-service-mtls
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: product-query-service
+  mtls:
+    mode: STRICT
+
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: order-service-mtls
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: order-service
+  mtls:
+    mode: STRICT
+
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: user-service-mtls
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: user-service
+  mtls:
+    mode: STRICT

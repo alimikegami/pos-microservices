@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"time"
 
@@ -88,11 +87,7 @@ func (app *App) Start() {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
-	go func() {
-		if err := e.Start(fmt.Sprintf(":%s", app.Config.ServicePort)); err != nil && err != http.ErrServerClosed {
-			logger.Error().Err(err).Msg("Server shutdown error")
-		}
-	}()
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", app.Config.ServicePort)))
 
 	app.Server = e
 }

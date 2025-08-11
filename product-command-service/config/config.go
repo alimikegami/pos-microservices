@@ -8,18 +8,20 @@ import (
 )
 
 type Config struct {
-	ServicePort   string
-	MongoDBConfig MongoDBConfig
-	KafkaConfig   KafkaConfig
-	JWTSecret     string
-	TracingConfig TracingConfig
+	ServicePort     string
+	GrpcServicePort string
+	MongoDBConfig   MongoDBConfig
+	KafkaConfig     KafkaConfig
+	JWTSecret       string
+	TracingConfig   TracingConfig
 }
 
 func CreateNewConfig() *Config {
 	godotenv.Load(".env")
 
 	conf := Config{
-		ServicePort: os.Getenv("SERVICE_PORT"),
+		ServicePort:     os.Getenv("SERVICE_PORT"),
+		GrpcServicePort: os.Getenv("GRPC_SERVICE_PORT"),
 		MongoDBConfig: MongoDBConfig{
 			DBHost: os.Getenv("DB_HOST"),
 			DBPort: os.Getenv("DB_PORT"),

@@ -18,11 +18,14 @@ import (
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/dto"
+	pb "github.com/alimikegami/pos-microservices/proto-defs/pb"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -95,10 +98,26 @@ func main() {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
+	productCommandGrpcConn, err := grpc.NewClient(config.ProductCommandServiceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to gRPC server")
+	}
+	defer productCommandGrpcConn.Close()
+
+	productCommandGrpcClient := pb.NewProductCommandServiceClient(productCommandGrpcConn)
+
+	productQueryGrpcConn, err := grpc.NewClient(config.ProductQueryServiceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to gRPC server")
+	}
+	defer productQueryGrpcConn.Close()
+
+	productQueryGrpcClient := pb.NewProductQueryServiceClient(productQueryGrpcConn)
+
 	cb := circuitbreaker.CreateCircuitBreaker("order-service")
 
 	orderRepo := repository.CreateOrderRepository(db)
-	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer, config, cb)
+	orderSvc := service.CreateOrderService(orderRepo, midtransClient, kafkaReader, kafkaProducer, config, cb, productCommandGrpcClient, productQueryGrpcClient)
 	controller.CreateOrderController(g, orderSvc)
 	s, err := gocron.NewScheduler()
 	if err != nil {

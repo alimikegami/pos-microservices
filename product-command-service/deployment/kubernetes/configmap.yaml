@@ -12,3 +12,4 @@ data:
   BROKER_PARTITION: "0"
   ELASTIC_SEARCH_HOST: "http://elasticsearch:9200"
   COLLECTOR_HOST: "jaeger-collector"
+  GRPC_SERVICE_PORT: "50051"

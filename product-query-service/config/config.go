@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	ServicePort         string
+	GrpcServicePort     string
 	KafkaConfig         KafkaConfig
 	ElasticsearchConfig ElasticsearchConfig
 	JWTSecret           string
@@ -19,8 +20,9 @@ func CreateNewConfig() *Config {
 	godotenv.Load(".env")
 
 	conf := Config{
-		ServicePort: os.Getenv("SERVICE_PORT"),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
+		ServicePort:     os.Getenv("SERVICE_PORT"),
+		GrpcServicePort: os.Getenv("GRPC_SERVICE_PORT"),
+		JWTSecret:       os.Getenv("JWT_SECRET"),
 		KafkaConfig: KafkaConfig{
 			BrokerAddress: os.Getenv("BROKER_ADDRESS"),
 			BrokerTopic:   os.Getenv("BROKER_TOPIC"),

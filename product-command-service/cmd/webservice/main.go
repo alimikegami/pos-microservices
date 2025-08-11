@@ -3,21 +3,25 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
 	"github.com/alimikegami/point-of-sales/product-command-service/config"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/controller"
+	"github.com/alimikegami/point-of-sales/product-command-service/internal/handler"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/infrastructure/database/mongodb"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/infrastructure/message-queue/kafka"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/infrastructure/tracing"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/service"
 	"github.com/alimikegami/point-of-sales/product-command-service/pkg/dto"
+	pb "github.com/alimikegami/pos-microservices/proto-defs/pb"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -89,6 +93,16 @@ func main() {
 	})
 
 	go svc.ConsumeEvent()
+
+	srv := grpc.NewServer()
+	productGrpcServer := handler.CreateGRPCHandler(svc)
+	pb.RegisterProductCommandServiceServer(srv, productGrpcServer)
+
+	go func() {
+		log.Info().Msgf("gRPC server is running on port %s", config.GrpcServicePort)
+		lis, _ := net.Listen("tcp", fmt.Sprintf(":%s", config.GrpcServicePort))
+		srv.Serve(lis)
+	}()
 
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", config.ServicePort)))
 }
