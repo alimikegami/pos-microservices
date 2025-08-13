@@ -9,7 +9,7 @@ spec:
       app: kong
   mtls:
     mode: PERMISSIVE
-
+---
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
@@ -21,7 +21,7 @@ spec:
       app: product-command-service
   mtls:
     mode: STRICT
-
+---
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
@@ -33,7 +33,7 @@ spec:
       app: product-query-service
   mtls:
     mode: STRICT
-
+---
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
@@ -45,7 +45,7 @@ spec:
       app: order-service
   mtls:
     mode: STRICT
-
+---
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
