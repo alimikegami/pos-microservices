@@ -2,6 +2,16 @@
 
 This is a work-in-progress side project, serving as an experimental playground to help me explore the intricacies of microservices. Please note that some implementations of certain concepts may not be 100% correct, as this is primarily a learning exercise.
 
+## Contents
+- [Architecure Overview](#architecture-overview)
+- [Deployment](#deployment)
+- [API Gateway](#api-gateway)
+- [Services](#services)
+- [Testing](#testing)
+- [Observability](#observability)
+- [Security](#security)
+
+
 ## Architecture Overview
 The microservices in this project communicate via gRPC and message queues.
 
@@ -29,3 +39,7 @@ Test coverage for this project is currently very limited. At the moment, there a
 ## Observability
 ### Traces
 All services use OpenTelemetry to generate traces, which are collected and visualized in Jaeger
+
+## Security
+### Mutual TLS (mTLS) with Istio
+Inter-service communication is secured using Istio’s mTLS, and external requests are allowed only through the API gateway (Kong).
