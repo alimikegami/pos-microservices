@@ -32,7 +32,7 @@ import (
 )
 
 func main() {
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Logger()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	log.Logger = logger
 
@@ -80,7 +80,6 @@ func main() {
 
 	// Used empty string so that metrics are not prefixed with the service name making it easier to aggregate across services
 	e.Use(echoprometheus.NewMiddleware(""))
-	fmt.Println("new update here")
 	go func() {
 		metrics := echo.New()
 		metrics.GET("/metrics", echoprometheus.NewHandler())

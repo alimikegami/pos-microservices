@@ -37,6 +37,9 @@ This service is responsible for order management and payment processing, and is 
 Test coverage for this project is currently very limited. At the moment, there are only a few integration tests, which use Testcontainers to spin up database containers.
 
 ## Observability
+## Logs
+Logs are collected by Promtail, stored in Grafana Loki, and visualized in Grafana dashboards.
+
 ### Traces
 All services use OpenTelemetry to generate traces, which are collected and visualized in Jaeger
 
@@ -48,4 +51,4 @@ All services exposes `/metrics` endpoint that are retrieved by Prometheus. Curre
 Inter-service communication is secured using Istio’s mTLS, and external requests are allowed only through the API gateway (Kong).
 
 ## AI Usage
-This project leverages AI to generate Kubernetes configurations for infrastructure and to learn new concepts. Sometimes I also generate specific parts of the code, but I write most of the code and business logic myself.
+This project leverages AI to generate Kubernetes configurations for infrastructure and to learn new concepts. Sometimes I also generate specific parts of the code, but I write most of the code and business logic myself with the help of Github Copilot.

@@ -1,0 +1,60 @@
+# Disable Istio sidecar for the log shipper
+podAnnotations:
+  sidecar.istio.io/inject: "false"
+
+config:
+  # Promtail needs these when you override config
+  server:
+    http_listen_port: 3101
+    grpc_listen_port: 0
+  positions:
+    filename: /run/promtail/positions.yaml
+
+  clients:
+    - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+
+  scrape_configs:
+    - job_name: kubernetes-pods
+      kubernetes_sd_configs:
+        - role: pod
+
+      # (optional) add parsing stages here later
+      pipeline_stages: []
+
+      relabel_configs:
+        # only default namespace (change if needed)
+        - action: keep
+          source_labels: [__meta_kubernetes_namespace]
+          regex: default
+
+        # only your POS services
+        - action: keep
+          source_labels: [__meta_kubernetes_pod_label_app]
+          regex: (user-service|product-command-service|product-query-service|order-service)
+
+        # drop init containers
+        - action: drop
+          source_labels: [__meta_kubernetes_pod_container_init]
+          regex: "true"
+
+        # standard labels
+        - action: replace
+          source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+        - action: replace
+          source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+        - action: replace
+          source_labels: [__meta_kubernetes_pod_container_name]
+          target_label: container
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+
+        # correct path for containerd-style pod logs
+        - action: replace
+          replacement: /var/log/pods/*$1/*/*.log
+          separator: /
+          source_labels:
+            - __meta_kubernetes_pod_uid
+            - __meta_kubernetes_pod_container_name
+          target_label: __path__

@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Logger()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	log.Logger = logger
 
