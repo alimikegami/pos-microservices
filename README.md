@@ -10,7 +10,7 @@ This is a work-in-progress side project, serving as an experimental playground t
 - [Testing](#testing)
 - [Observability](#observability)
 - [Security](#security)
-
+- [AI Usage](#ai-usage)
 
 ## Architecture Overview
 The microservices in this project communicate via gRPC and message queues.
@@ -40,6 +40,12 @@ Test coverage for this project is currently very limited. At the moment, there a
 ### Traces
 All services use OpenTelemetry to generate traces, which are collected and visualized in Jaeger
 
+### Metrics
+All services exposes `/metrics` endpoint that are retrieved by Prometheus. Currently, I've created RED (rate, errors, duration) metrics visualized in Grafana. Service monitor configuration for the Prometheus can be found in `/prometheus/service-monitor directory`. For this project, I'm using Helm charts to deploy the Grafana and Prometheus.
+
 ## Security
 ### Mutual TLS (mTLS) with Istio
 Inter-service communication is secured using Istio’s mTLS, and external requests are allowed only through the API gateway (Kong).
+
+## AI Usage
+This project leverages AI to generate Kubernetes configurations for infrastructure and to learn new concepts. Sometimes I also generate specific parts of the code, but I write most of the code and business logic myself.

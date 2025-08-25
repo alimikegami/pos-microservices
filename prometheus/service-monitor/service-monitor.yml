@@ -1,0 +1,115 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-service-service-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      app: user-service
+  endpoints:
+    - port: http-metrics          
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          separator: ;
+          sourceLabels:
+            - __meta_kubernetes_service_name
+            - __meta_kubernetes_namespace
+          regex: (.+);(.+)
+          replacement: $1.$2.svc.cluster.local:8081
+          targetLabel: __address__
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: product-query-service-service-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      app: product-query-service
+  endpoints:
+    - port: http-metrics                  
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          separator: ;
+          sourceLabels:
+            - __meta_kubernetes_service_name
+            - __meta_kubernetes_namespace
+          regex: (.+);(.+)
+          replacement: $1.$2.svc.cluster.local:8081
+          targetLabel: __address__
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: product-command-service-service-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      app: product-command-service
+  endpoints:
+    - port: http-metrics                  
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          separator: ;
+          sourceLabels:
+            - __meta_kubernetes_service_name
+            - __meta_kubernetes_namespace
+          regex: (.+);(.+)
+          replacement: $1.$2.svc.cluster.local:8081
+          targetLabel: __address__
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: order-service-service-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - default
+  selector:
+    matchLabels:
+      app: order-service
+  endpoints:
+    - port: http-metrics                  
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - action: replace
+          separator: ;
+          sourceLabels:
+            - __meta_kubernetes_service_name
+            - __meta_kubernetes_namespace
+          regex: (.+);(.+)
+          replacement: $1.$2.svc.cluster.local:8081
+          targetLabel: __address__

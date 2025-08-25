@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	ServicePort         string
+	MetricsPort         string
 	GrpcServicePort     string
 	KafkaConfig         KafkaConfig
 	ElasticsearchConfig ElasticsearchConfig
@@ -21,6 +22,7 @@ func CreateNewConfig() *Config {
 
 	conf := Config{
 		ServicePort:     os.Getenv("SERVICE_PORT"),
+		MetricsPort:     os.Getenv("METRICS_PORT"),
 		GrpcServicePort: os.Getenv("GRPC_SERVICE_PORT"),
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		KafkaConfig: KafkaConfig{

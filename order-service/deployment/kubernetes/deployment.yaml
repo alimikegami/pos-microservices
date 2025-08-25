@@ -13,13 +13,17 @@ spec:
     metadata:
       labels:
         app: order-service
+        istio.io/rev: default
     spec:
       containers:
       - name: order-service
-        image: alimikegami/pos:order-service
+        image: alimikegami/pos:order-service-latest
         imagePullPolicy: Always
         envFrom:
         - configMapRef:
             name: order-service-config
         ports:
         - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: http-metrics

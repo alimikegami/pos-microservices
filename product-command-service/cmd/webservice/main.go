@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/service"
 	"github.com/alimikegami/point-of-sales/product-command-service/pkg/dto"
 	pb "github.com/alimikegami/pos-microservices/proto-defs/pb"
+	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
@@ -67,6 +69,17 @@ func main() {
 			return next(c)
 		}
 	})
+
+	// Used empty string so that metrics are not prefixed with the service name making it easier to aggregate across services
+	e.Use(echoprometheus.NewMiddleware(""))
+
+	go func() {
+		metrics := echo.New()
+		metrics.GET("/metrics", echoprometheus.NewHandler())
+		if err := metrics.Start(fmt.Sprintf(":%s", config.MetricsPort)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal().Err(err).Msg("Failed to start metrics server")
+		}
+	}()
 
 	g := e.Group("/api/v1")
 

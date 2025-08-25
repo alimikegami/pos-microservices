@@ -11,6 +11,7 @@ spec:
     metadata:
       labels:
         app: kong
+        istio.io/rev: default
     spec:
       containers:
       - name: kong

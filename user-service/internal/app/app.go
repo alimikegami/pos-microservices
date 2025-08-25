@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/alimikegami/pos-microservices/user-service/internal/service"
 	"github.com/alimikegami/pos-microservices/user-service/pkg/dto"
 	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
@@ -57,6 +60,17 @@ func (app *App) Start() {
 			return next(c)
 		}
 	})
+
+	// Used empty string so that metrics are not prefixed with the service name making it easier to aggregate across services
+	e.Use(echoprometheus.NewMiddleware(""))
+
+	go func() {
+		metrics := echo.New()
+		metrics.GET("/metrics", echoprometheus.NewHandler())
+		if err := metrics.Start(fmt.Sprintf(":%s", app.Config.MetricsPort)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal().Err(err).Msg("Failed to start metrics server")
+		}
+	}()
 
 	g := e.Group("/api/v1")
 

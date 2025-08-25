@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Environment      string
 	ServicePort      string
+	MetricsPort      string
 	PostgreSQLConfig PostgreSQLConfig
 	JWTConfig        JWTConfig
 	KafkaConfig      KafkaConfig
@@ -31,6 +32,7 @@ func CreateNewConfig() *Config {
 
 	conf := Config{
 		ServicePort: os.Getenv("SERVICE_PORT"),
+		MetricsPort: os.Getenv("METRICS_PORT"),
 		PostgreSQLConfig: PostgreSQLConfig{
 			DBHost:     os.Getenv("DB_HOST"),
 			DBName:     os.Getenv("DB_NAME"),
