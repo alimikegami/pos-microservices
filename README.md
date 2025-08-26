@@ -37,7 +37,7 @@ This service is responsible for order management and payment processing, and is 
 Test coverage for this project is currently very limited. At the moment, there are only a few integration tests, which use Testcontainers to spin up database containers.
 
 ## Observability
-## Logs
+### Logs
 Logs are collected by Promtail, stored in Grafana Loki, and visualized in Grafana dashboards.
 
 ### Traces
