@@ -55,115 +55,90 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 	}
 
 	var productReqPayload dto.OrderProductServiceRequest
+	var products []*pb.ProductQuantityUpdate
+	productIDs := make([]string, len(req.OrderItems))
+
 	productReqPayload.TransactionNumber = trxNumber.String()
-	for _, item := range req.OrderItems {
+	for i, item := range req.OrderItems {
 		productReqPayload.OrderItems = append(productReqPayload.OrderItems, dto.OrderItem{
 			ProductID: item.ProductID,
 			Quantity:  item.Quantity,
 		})
+
+		productIDs[i] = item.ProductID
+		products = append(products, &pb.ProductQuantityUpdate{
+			ProductId: item.ProductID,
+			Quantity:  int64(item.Quantity),
+		})
 	}
 
-	paymentMethod, err := s.repository.GetPaymentMethodByID(ctx, req.PaymentMethodID)
+	productPrices, err := s.productQueryGrpcClient.GetProductPrice(ctx, &pb.GetProductPriceRequest{
+		ProductIds: productIDs,
+	})
 	if err != nil {
+		log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to get product price info")
 		return orderResponse, err
 	}
 
-	err = s.repository.HandleTrx(ctx, func(ctx context.Context, repo repository.OrderRepository) error {
-		var paymentType coreapi.CoreapiPaymentType
+	productPriceMap := make(map[string]*pb.Product, len(productPrices.Products))
+	for _, product := range productPrices.Products {
+		productPriceMap[product.ProductId] = product
+	}
 
-		var orderDetails []domain.OrderDetail
-		var products []*pb.ProductQuantityUpdate
-		productIDs := make([]string, len(req.OrderItems))
-		for i, item := range req.OrderItems {
-			productIDs[i] = item.ProductID
-			products = append(products, &pb.ProductQuantityUpdate{
-				ProductId: item.ProductID,
-				Quantity:  int64(item.Quantity),
-			})
-		}
-
-		productPrices, err := s.productQueryGrpcClient.GetProductPrice(ctx, &pb.GetProductPriceRequest{
-			ProductIds: productIDs,
-		})
-
-		if err != nil {
-			log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to get product price info")
-			return err
-		}
-
-		_, err = s.productService.Execute(func() ([]byte, error) {
-			_, err := s.productCommandGrpcServer.UpdateProductQuantityBatch(context.Background(), &pb.UpdateProductQuantityRequest{
-				Products: products,
-			})
-
-			if err != nil {
-				log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
-				return nil, err
-			}
-
-			return nil, nil
+	_, err = s.productService.Execute(func() ([]byte, error) {
+		_, err := s.productCommandGrpcServer.UpdateProductQuantityBatch(context.Background(), &pb.UpdateProductQuantityRequest{
+			Products: products,
 		})
 
 		if err != nil {
 			log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
-			return err
+			return nil, err
 		}
 
-		restoreProductMsg := dto.KafkaMessage{
-			EventType: "restore_product_stock",
-			Data:      productReqPayload,
-		}
+		return nil, nil
+	})
 
-		restoreProductMsgParsed, err := json.Marshal(restoreProductMsg)
-		if err != nil {
-			log.Info().Msg("Restoring product stock")
-			go func() {
-				err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
-				if err != nil {
-					log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
-				}
-			}()
+	if err != nil {
+		log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
+		return orderResponse, err
+	}
 
-			log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to marshal restore product stock message")
+	restoreProductMsg := dto.KafkaMessage{
+		EventType: "restore_product_stock",
+		Data:      productReqPayload,
+	}
 
-			return err
-		}
-
-		var totalAmount float64
-		chargeItems := make([]midtrans.ItemDetails, len(req.OrderItems))
-		for i, item := range req.OrderItems {
-			var productInfo dto.ProductRecord
-			for _, p := range productPrices.Products {
-				if p.ProductId == item.ProductID {
-					productInfo = dto.ProductRecord{
-						ID:       p.ProductId,
-						Name:     p.Name,
-						Price:    float64(p.Price),
-						Quantity: int(p.Quantity),
-					}
-					orderDetails = append(orderDetails, domain.OrderDetail{
-						ProductID:   p.ProductId,
-						Quantity:    int64(item.Quantity),
-						Amount:      float64(p.Price),
-						ProductName: p.Name,
-						CreatedAt:   time.Now().Unix(),
-						UpdatedAt:   time.Now().Unix(),
-					})
-					break
-				}
+	restoreProductMsgParsed, err := json.Marshal(restoreProductMsg)
+	if err != nil {
+		log.Info().Msg("Restoring product stock")
+		go func() {
+			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
 			}
+		}()
 
-			if productInfo.ID == "" {
-				log.Info().Msg("Restoring product stock")
-				go func() {
-					err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
-					if err != nil {
-						log.Error().Err(err).Str("component", "AddOrder").Msg("")
-					}
-				}()
+		log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to marshal restore product stock message")
 
-				return fmt.Errorf("product info not found for product ID: %s", item.ProductID)
-			}
+		return orderResponse, err
+	}
+
+	var paymentType coreapi.CoreapiPaymentType
+	var orderDetails []domain.OrderDetail
+
+	var totalAmount float64
+	chargeItems := make([]midtrans.ItemDetails, len(req.OrderItems))
+	for i, item := range req.OrderItems {
+		productInfo, exists := productPriceMap[item.ProductID]
+		if exists {
+			orderDetails = append(orderDetails, domain.OrderDetail{
+				ProductID:   productInfo.ProductId,
+				Quantity:    int64(item.Quantity),
+				Amount:      float64(productInfo.Price),
+				ProductName: productInfo.Name,
+				CreatedAt:   time.Now().Unix(),
+				UpdatedAt:   time.Now().Unix(),
+			})
 
 			itemTotal := float64(productInfo.Price) * float64(item.Quantity)
 			totalAmount += itemTotal
@@ -173,29 +148,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 				Qty:   int32(item.Quantity),
 				Name:  productInfo.Name,
 			}
-		}
-
-		if strings.ToLower(paymentMethod.Name) == "qris" {
-			paymentType = coreapi.PaymentTypeQris
-		}
-
-		chargeReq := &coreapi.ChargeReq{
-			PaymentType: paymentType,
-			TransactionDetails: midtrans.TransactionDetails{
-				OrderID:  trxNumber.String(),
-				GrossAmt: int64(totalAmount),
-			},
-			CustomerDetails: &midtrans.CustomerDetails{
-				FName: "John",
-				LName: "Doe",
-				Email: "john@example.com",
-				Phone: "081234567890",
-			},
-			Items: &chargeItems,
-		}
-
-		response, err := s.midtransClient.ChargeTransaction(chargeReq)
-		if response.StatusCode != "201" {
+		} else {
 			log.Info().Msg("Restoring product stock")
 			go func() {
 				err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
@@ -204,29 +157,74 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 				}
 			}()
 
-			return fmt.Errorf("payment gateway returned non-200 status: %s", response.StatusCode)
+			return orderResponse, fmt.Errorf("product info not found for product ID: %s", item.ProductID)
 		}
+	}
 
-		fmt.Printf("%+v\n", response)
+	paymentMethod, err := s.repository.GetPaymentMethodByID(ctx, req.PaymentMethodID)
+	if err != nil {
+		log.Info().Msg("Restoring product stock")
+		go func() {
+			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
+			}
+		}()
+		return orderResponse, err
+	}
 
-		if strings.ToLower(paymentMethod.Name) == "qris" {
-			orderResponse.QRCode = &response.QRString
-		}
+	if strings.ToLower(paymentMethod.Name) == "qris" {
+		paymentType = coreapi.PaymentTypeQris
+	}
 
-		expiredAt, err := utils.ConvertDateTimeWibToUnixTimestamp(response.ExpiryTime)
-		if err != nil {
-			log.Info().Msg("Restoring product stock")
-			go func() {
-				err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
-				if err != nil {
-					log.Error().Err(err).Str("component", "AddOrder").Msg("")
-				}
-			}()
+	chargeReq := &coreapi.ChargeReq{
+		PaymentType: paymentType,
+		TransactionDetails: midtrans.TransactionDetails{
+			OrderID:  trxNumber.String(),
+			GrossAmt: int64(totalAmount),
+		},
+		CustomerDetails: &midtrans.CustomerDetails{
+			FName: "John",
+			LName: "Doe",
+			Email: "john@example.com",
+			Phone: "081234567890",
+		},
+		Items: &chargeItems,
+	}
 
-			log.Error().Err(err).Str("component", "AddOrder").Msg("")
-			return err
-		}
+	response, err := s.midtransClient.ChargeTransaction(chargeReq)
+	log.Info().Msg("Midtrans response status: " + response.StatusCode)
+	if response.StatusCode != "201" {
+		log.Info().Msg("Restoring product stock")
+		go func() {
+			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("")
+			}
+		}()
 
+		return orderResponse, fmt.Errorf("payment gateway returned non-200 status: %s", response.StatusCode)
+	}
+
+	if strings.ToLower(paymentMethod.Name) == "qris" {
+		orderResponse.QRCode = &response.QRString
+	}
+
+	expiredAt, err := utils.ConvertDateTimeWibToUnixTimestamp(response.ExpiryTime)
+	if err != nil {
+		log.Info().Msg("Restoring product stock")
+		go func() {
+			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
+			if err != nil {
+				log.Error().Err(err).Str("component", "AddOrder").Msg("")
+			}
+		}()
+
+		log.Error().Err(err).Str("component", "AddOrder").Msg("")
+		return orderResponse, err
+	}
+
+	err = s.repository.HandleTrx(ctx, func(ctx context.Context, repo repository.OrderRepository) error {
 		orderID, err := repo.AddOrder(ctx, domain.Order{
 			PaymentMethodID:   int64(req.PaymentMethodID),
 			Amount:            totalAmount,
