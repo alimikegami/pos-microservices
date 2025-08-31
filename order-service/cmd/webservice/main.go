@@ -27,6 +27,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -59,7 +60,7 @@ func main() {
 		}
 	}()
 
-	tracer := traceProvider.Tracer("pos-order-service")
+	tracer := traceProvider.Tracer("order-service")
 
 	e := echo.New()
 	g := e.Group("/api/v1")
@@ -111,7 +112,7 @@ func main() {
 		return dto.WriteSuccessResponse(c, "Hello, World!")
 	})
 
-	productCommandGrpcConn, err := grpc.NewClient(config.ProductCommandServiceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	productCommandGrpcConn, err := grpc.NewClient(config.ProductCommandServiceHost, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to gRPC server")
 	}
@@ -119,7 +120,7 @@ func main() {
 
 	productCommandGrpcClient := pb.NewProductCommandServiceClient(productCommandGrpcConn)
 
-	productQueryGrpcConn, err := grpc.NewClient(config.ProductQueryServiceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	productQueryGrpcConn, err := grpc.NewClient(config.ProductQueryServiceHost, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to gRPC server")
 	}

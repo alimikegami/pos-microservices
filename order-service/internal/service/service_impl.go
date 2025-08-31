@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/sony/gobreaker/v2"
+	"go.opentelemetry.io/otel"
 
 	"github.com/alimikegami/point-of-sales/order-service/config"
 	"github.com/alimikegami/point-of-sales/order-service/internal/domain"
@@ -86,7 +87,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 	}
 
 	_, err = s.productService.Execute(func() ([]byte, error) {
-		_, err := s.productCommandGrpcServer.UpdateProductQuantityBatch(context.Background(), &pb.UpdateProductQuantityRequest{
+		_, err := s.productCommandGrpcServer.UpdateProductQuantityBatch(ctx, &pb.UpdateProductQuantityRequest{
 			Products: products,
 		})
 
@@ -177,6 +178,9 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		paymentType = coreapi.PaymentTypeQris
 	}
 
+	tracer := otel.Tracer("pos-order-service")
+	_, span := tracer.Start(ctx, "midtrans charge request")
+
 	chargeReq := &coreapi.ChargeReq{
 		PaymentType: paymentType,
 		TransactionDetails: midtrans.TransactionDetails{
@@ -192,7 +196,12 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		Items: &chargeItems,
 	}
 
-	response, err := s.midtransClient.ChargeTransaction(chargeReq)
+	s.midtransClient.Options.SetContext(ctx)
+
+	response, _ := s.midtransClient.ChargeTransaction(chargeReq)
+
+	span.End()
+
 	log.Info().Msg("Midtrans response status: " + response.StatusCode)
 	if response.StatusCode != "201" {
 		log.Info().Msg("Restoring product stock")
