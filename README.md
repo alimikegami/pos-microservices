@@ -43,6 +43,8 @@ Logs are collected by Promtail, stored in Grafana Loki, and visualized in Grafan
 ### Traces
 All services use OpenTelemetry to generate traces, which are collected and visualized in Jaeger
 
+![traces](./assets/traces.png)
+
 ### Metrics
 All services exposes `/metrics` endpoint that are retrieved by Prometheus. Currently, I've created RED (rate, errors, duration) metrics visualized in Grafana. Service monitor configuration for the Prometheus can be found in `/prometheus/service-monitor directory`. For this project, I'm using Helm charts to deploy the Grafana and Prometheus.
 
