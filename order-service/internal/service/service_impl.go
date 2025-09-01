@@ -32,11 +32,11 @@ type OrderServiceImpl struct {
 	kafkaProducer            *kafka.Conn
 	config                   *config.Config
 	productService           *gobreaker.CircuitBreaker[[]byte]
-	productCommandGrpcServer pb.ProductCommandServiceClient
+	productCommandGrpcClient pb.ProductCommandServiceClient
 	productQueryGrpcClient   pb.ProductQueryServiceClient
 }
 
-func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn, config *config.Config, productService *gobreaker.CircuitBreaker[[]byte], productCommandGrpcServer pb.ProductCommandServiceClient, productQueryGrpcClient pb.ProductQueryServiceClient) OrderService {
+func CreateOrderService(repository repository.OrderRepository, midtransClient *coreapi.Client, kafkaReader *kafka.Reader, kafkaProducer *kafka.Conn, config *config.Config, productService *gobreaker.CircuitBreaker[[]byte], productCommandGrpcClient pb.ProductCommandServiceClient, productQueryGrpcClient pb.ProductQueryServiceClient) OrderService {
 	return &OrderServiceImpl{
 		repository:               repository,
 		midtransClient:           midtransClient,
@@ -44,7 +44,7 @@ func CreateOrderService(repository repository.OrderRepository, midtransClient *c
 		kafkaProducer:            kafkaProducer,
 		config:                   config,
 		productService:           productService,
-		productCommandGrpcServer: productCommandGrpcServer,
+		productCommandGrpcClient: productCommandGrpcClient,
 		productQueryGrpcClient:   productQueryGrpcClient,
 	}
 }
@@ -87,7 +87,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 	}
 
 	_, err = s.productService.Execute(func() ([]byte, error) {
-		_, err := s.productCommandGrpcServer.UpdateProductQuantityBatch(ctx, &pb.UpdateProductQuantityRequest{
+		_, err := s.productCommandGrpcClient.UpdateProductQuantityBatch(ctx, &pb.UpdateProductQuantityRequest{
 			Products: products,
 		})
 
