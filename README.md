@@ -40,6 +40,9 @@ Test coverage for this project is currently very limited. At the moment, there a
 ### Logs
 Logs are collected by Promtail, stored in Grafana Loki, and visualized in Grafana dashboards.
 
+![logs](./assets/logs.png)
+
+
 ### Traces
 All services use OpenTelemetry to generate traces, which are collected and visualized in Jaeger
 
@@ -48,9 +51,12 @@ All services use OpenTelemetry to generate traces, which are collected and visua
 ### Metrics
 All services exposes `/metrics` endpoint that are retrieved by Prometheus. Currently, I've created RED (rate, errors, duration) metrics visualized in Grafana. Service monitor configuration for the Prometheus can be found in `/prometheus/service-monitor directory`. For this project, I'm using Helm charts to deploy the Grafana and Prometheus.
 
+![metrics](./assets/metrics.png)
+
+
 ## Security
 ### Mutual TLS (mTLS) with Istio
 Inter-service communication is secured using Istio’s mTLS, and external requests are allowed only through the API gateway (Kong).
 
 ## AI Usage
-This project leverages AI to generate Kubernetes configurations for infrastructure and to learn new concepts. Sometimes I also generate specific parts of the code, but I write most of the code and business logic myself with the help of Github Copilot.
+This project leverages AI to generate Kubernetes configurations for infrastructure and to learn new concepts. Sometimes I also generate specific parts of the code (example: middleware), but I write most of the code and business logic myself with the help of Github Copilot.
