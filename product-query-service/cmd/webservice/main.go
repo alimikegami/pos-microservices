@@ -13,6 +13,7 @@ import (
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/handler"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/infrastructure/message-queue/kafka"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/infrastructure/tracing"
+	localmiddleware "github.com/alimikegami/point-of-sales/product-query-service/internal/middleware"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/product-query-service/internal/service"
 	"github.com/alimikegami/point-of-sales/product-query-service/pkg/dto"
@@ -62,6 +63,8 @@ func main() {
 			return next(c)
 		}
 	})
+
+	e.Use(localmiddleware.Logger)
 
 	// Used empty string so that metrics are not prefixed with the service name making it easier to aggregate across services
 	e.Use(echoprometheus.NewMiddleware(""))

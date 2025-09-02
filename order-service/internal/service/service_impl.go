@@ -77,7 +77,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		ProductIds: productIDs,
 	})
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to get product price info")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("Failed to get product price info")
 		return orderResponse, err
 	}
 
@@ -92,7 +92,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 		})
 
 		if err != nil {
-			log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
+			log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
 			return nil, err
 		}
 
@@ -100,7 +100,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 	})
 
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("Failed to update product quantity")
 		return orderResponse, err
 	}
 
@@ -111,15 +111,15 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 	restoreProductMsgParsed, err := json.Marshal(restoreProductMsg)
 	if err != nil {
-		log.Info().Msg("Restoring product stock")
+		log.Ctx(ctx).Info().Msg("Restoring product stock")
 		go func() {
 			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 			if err != nil {
-				log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
+				log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
 			}
 		}()
 
-		log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to marshal restore product stock message")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("Failed to marshal restore product stock message")
 
 		return orderResponse, err
 	}
@@ -150,11 +150,11 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 				Name:  productInfo.Name,
 			}
 		} else {
-			log.Info().Msg("Restoring product stock")
+			log.Ctx(ctx).Info().Msg("Restoring product stock")
 			go func() {
 				err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 				if err != nil {
-					log.Error().Err(err).Str("component", "AddOrder").Msg("")
+					log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
 				}
 			}()
 
@@ -164,11 +164,11 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 	paymentMethod, err := s.repository.GetPaymentMethodByID(ctx, req.PaymentMethodID)
 	if err != nil {
-		log.Info().Msg("Restoring product stock")
+		log.Ctx(ctx).Info().Msg("Restoring product stock")
 		go func() {
 			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 			if err != nil {
-				log.Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
+				log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("Failed to write restore product stock message")
 			}
 		}()
 		return orderResponse, err
@@ -202,9 +202,9 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 	span.End()
 
-	log.Info().Msg("Midtrans response status: " + response.StatusCode)
+	log.Ctx(ctx).Info().Msg("Midtrans response status: " + response.StatusCode)
 	if response.StatusCode != "201" {
-		log.Info().Msg("Restoring product stock")
+		log.Ctx(ctx).Info().Msg("Restoring product stock")
 		go func() {
 			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 			if err != nil {
@@ -221,7 +221,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 	expiredAt, err := utils.ConvertDateTimeWibToUnixTimestamp(response.ExpiryTime)
 	if err != nil {
-		log.Info().Msg("Restoring product stock")
+		log.Ctx(ctx).Info().Msg("Restoring product stock")
 		go func() {
 			err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 			if err != nil {
@@ -229,7 +229,7 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			}
 		}()
 
-		log.Error().Err(err).Str("component", "AddOrder").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
 		return orderResponse, err
 	}
 
@@ -244,12 +244,12 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 			UpdatedAt:         time.Now().Unix(),
 		})
 		if err != nil {
-			log.Error().Err(err).Str("component", "AddOrder").Msg("")
-			log.Info().Msg("Restoring product stock")
+			log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
+			log.Ctx(ctx).Info().Msg("Restoring product stock")
 			go func() {
 				err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 				if err != nil {
-					log.Error().Err(err).Str("component", "AddOrder").Msg("")
+					log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
 				}
 			}()
 
@@ -262,12 +262,12 @@ func (s *OrderServiceImpl) AddOrder(ctx context.Context, req dto.OrderRequest) (
 
 		err = repo.AddOrderDetails(ctx, orderDetails)
 		if err != nil {
-			log.Error().Err(err).Str("component", "AddOrder").Msg("")
-			log.Info().Msg("Restoring product stock")
+			log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
+			log.Ctx(ctx).Info().Msg("Restoring product stock")
 			go func() {
 				err = s.WriteKafkaMessageWithKey(restoreProductMsgParsed, trxNumber.String())
 				if err != nil {
-					log.Error().Err(err).Str("component", "AddOrder").Msg("")
+					log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
 				}
 			}()
 			return err

@@ -25,7 +25,7 @@ func CreateOrderRepository(db *sqlx.DB) OrderRepository {
 func (r *OrderRepositoryImpl) AddOrder(ctx context.Context, data domain.Order) (id int64, err error) {
 	nstmt, err := r.tx.PrepareNamedContext(ctx, "INSERT INTO orders(payment_method_id, amount, mdr_fee, transaction_number, payment_status, expired_at, created_at, updated_at) VALUES (:payment_method_id, :amount, :mdr_fee, :transaction_number, :payment_status, :expired_at, :created_at, :updated_at) returning id")
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddOrder").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddOrder").Msg("")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (r *OrderRepositoryImpl) AddOrder(ctx context.Context, data domain.Order) (
 func (r *OrderRepositoryImpl) AddOrderDetails(ctx context.Context, data []domain.OrderDetail) (err error) {
 	_, err = r.tx.NamedExecContext(ctx, "INSERT INTO order_details(product_id, order_id, quantity, amount, product_name, created_at, updated_at) VALUES (:product_id, :order_id, :quantity, :amount, :product_name, :created_at, :updated_at)", data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddOrderDetails").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddOrderDetails").Msg("")
 		return
 	}
 
@@ -52,7 +52,7 @@ func (r *OrderRepositoryImpl) GetOrderByTransactionNumber(ctx context.Context, t
 	row := r.db.QueryRowxContext(ctx, "SELECT * FROM orders WHERE transaction_number = $1 AND deleted_at IS NULL", transactionNumber)
 	err = row.StructScan(&data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUserByEmail").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetUserByEmail").Msg("")
 		if err == sql.ErrNoRows {
 			return data, nil
 		}
@@ -65,7 +65,7 @@ func (r *OrderRepositoryImpl) GetOrderByTransactionNumber(ctx context.Context, t
 func (r *OrderRepositoryImpl) UpdateOrderPaymentStatus(ctx context.Context, data domain.Order) (err error) {
 	_, err = r.db.NamedExecContext(ctx, "UPDATE orders SET payment_status = :payment_status WHERE id=:id AND deleted_at IS NULL", data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateOrderPaymentStatus").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "UpdateOrderPaymentStatus").Msg("")
 		return
 	}
 
@@ -96,13 +96,13 @@ func (r *OrderRepositoryImpl) GetOrders(ctx context.Context, filter pkgdto.Filte
 	query += " ORDER BY id DESC"
 	nstmt, err := r.db.PrepareNamedContext(ctx, query)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrders").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetOrders").Msg("")
 		return nil, err
 	}
 
 	err = nstmt.SelectContext(ctx, &data, args)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrders").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetOrders").Msg("")
 		return nil, err
 	}
 
@@ -114,7 +114,7 @@ func (r *OrderRepositoryImpl) GetOrderByOrderID(ctx context.Context, id int64) (
 
 	err = row.StructScan(&data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrderByOrderID").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetOrderByOrderID").Msg("")
 		if err == sql.ErrNoRows {
 			return data, nil
 		}
@@ -131,13 +131,13 @@ func (r *OrderRepositoryImpl) GetOrderDetailsByOrderID(ctx context.Context, id i
 
 	nstmt, err := r.db.PrepareNamedContext(ctx, query)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
 		return nil, err
 	}
 
 	err = nstmt.SelectContext(ctx, &data, args)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetOrderDetailsByOrderID").Msg("")
 		return nil, err
 	}
 
@@ -149,7 +149,7 @@ func (r *OrderRepositoryImpl) GetPaymentMethodByID(ctx context.Context, id uint6
 
 	err = row.StructScan(&data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetPaymentMethodByID").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetPaymentMethodByID").Msg("")
 		if err == sql.ErrNoRows {
 			return data, nil
 		}

@@ -11,13 +11,13 @@ import (
 	"github.com/alimikegami/pos-microservices/user-service/config"
 	"github.com/alimikegami/pos-microservices/user-service/internal/controller"
 	"github.com/alimikegami/pos-microservices/user-service/internal/infrastructure/tracing"
+	localmiddleware "github.com/alimikegami/pos-microservices/user-service/internal/middleware"
 	"github.com/alimikegami/pos-microservices/user-service/internal/repository"
 	"github.com/alimikegami/pos-microservices/user-service/internal/service"
 	"github.com/alimikegami/pos-microservices/user-service/pkg/dto"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -63,6 +63,7 @@ func (app *App) Start() {
 
 	// Used empty string so that metrics are not prefixed with the service name making it easier to aggregate across services
 	e.Use(echoprometheus.NewMiddleware(""))
+	e.Use(localmiddleware.Logger)
 
 	go func() {
 		metrics := echo.New()
@@ -73,25 +74,6 @@ func (app *App) Start() {
 	}()
 
 	g := e.Group("/api/v1")
-
-	g.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogURI:      true,
-		LogStatus:   true,
-		LogLatency:  true,
-		LogRemoteIP: true,
-		LogMethod:   true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			logger.Info().
-				Str("method", v.Method).
-				Str("URI", v.URI).
-				Int("status", v.Status).
-				Int64("latency", v.Latency.Microseconds()).
-				Str("remote IP", v.RemoteIP).
-				Msg("Request")
-
-			return nil
-		},
-	}))
 
 	repo := repository.CreateNewRepository(app.DB)
 	svc := service.CreateNewService(repo, *app.Config)

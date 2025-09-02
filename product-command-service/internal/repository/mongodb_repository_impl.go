@@ -25,7 +25,7 @@ func CreateNewMongoDBRepository(db *mongo.Database) MongoDBProductRepository {
 func (r *MongoDBProductRepositoryImpl) AddProduct(ctx context.Context, data domain.Product) (id primitive.ObjectID, err error) {
 	result, err := r.db.Collection("products").InsertOne(ctx, data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddProduct").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddProduct").Msg("")
 		return
 	}
 
@@ -41,12 +41,12 @@ func (r *MongoDBProductRepositoryImpl) GetProducts(ctx context.Context, param pk
 
 	cursor, err := r.db.Collection("products").Find(ctx, nil, opts)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetProducts").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetProducts").Msg("")
 		return
 	}
 
 	if err = cursor.All(ctx, &data); err != nil {
-		log.Error().Err(err).Str("component", "GetProducts").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetProducts").Msg("")
 		return
 	}
 
@@ -56,7 +56,7 @@ func (r *MongoDBProductRepositoryImpl) GetProducts(ctx context.Context, param pk
 func (r *MongoDBProductRepositoryImpl) GetProductByID(ctx context.Context, id string) (product domain.Product, err error) {
 	productID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetProductByID").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetProductByID").Msg("")
 		return
 	}
 
@@ -65,7 +65,7 @@ func (r *MongoDBProductRepositoryImpl) GetProductByID(ctx context.Context, id st
 
 	err = r.db.Collection("products").FindOne(ctx, filter, opts).Decode(&product)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetProductByID").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetProductByID").Msg("")
 		if err == mongo.ErrNoDocuments {
 			return product, errs.ErrNotFound
 		}
@@ -79,7 +79,7 @@ func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ct
 	fmt.Println("starting session mongodb")
 	session, err := r.db.Client().StartSession()
 	if err != nil {
-		log.Error().Err(err).Str("component", "HandleTrx").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "HandleTrx").Msg("")
 		panic(err)
 	}
 
@@ -89,7 +89,7 @@ func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ct
 	_, err = session.WithTransaction(ctx, func(ctx mongo.SessionContext) (interface{}, error) {
 		err := fn(ctx)
 		if err != nil {
-			log.Error().Err(err).Str("component", "HandleTrx").Msg("")
+			log.Ctx(ctx).Error().Err(err).Str("component", "HandleTrx").Msg("")
 		}
 		return nil, err
 	})
@@ -100,7 +100,7 @@ func (r *MongoDBProductRepositoryImpl) HandleTrx(ctx context.Context, fn func(ct
 func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id string) (err error) {
 	productID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		log.Error().Err(err).Str("component", "DeleteProduct").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "DeleteProduct").Msg("")
 		return
 	}
 
@@ -108,7 +108,7 @@ func (r *MongoDBProductRepositoryImpl) DeleteProduct(ctx context.Context, id str
 
 	_, err = r.db.Collection("products").DeleteOne(ctx, filter)
 	if err != nil {
-		log.Error().Err(err).Str("component", "DeleteProduct").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "DeleteProduct").Msg("")
 		return
 	}
 
@@ -122,12 +122,12 @@ func (r *MongoDBProductRepositoryImpl) UpdateProduct(ctx context.Context, data d
 
 	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateProduct").Msg("Failed to update product")
+		log.Ctx(ctx).Error().Err(err).Str("component", "UpdateProduct").Msg("Failed to update product")
 		return
 	}
 
 	if result.MatchedCount == 0 {
-		log.Error().Err(err).Str("component", "UpdateProduct").Msg("Failed to update product")
+		log.Ctx(ctx).Error().Err(err).Str("component", "UpdateProduct").Msg("Failed to update product")
 		return errs.ErrNotFound
 	}
 
@@ -141,12 +141,12 @@ func (r *MongoDBProductRepositoryImpl) UpdateProductQuantity(ctx context.Context
 
 	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
-		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		log.Ctx(ctx).Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
 		return
 	}
 
 	if result.MatchedCount == 0 {
-		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		log.Ctx(ctx).Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
 		return errs.ErrNotFound
 	}
 
@@ -160,12 +160,12 @@ func (r *MongoDBProductRepositoryImpl) SetProductQuantity(ctx context.Context, d
 
 	result, err := r.db.Collection("products").UpdateOne(ctx, filter, update)
 	if err != nil {
-		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		log.Ctx(ctx).Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
 		return
 	}
 
 	if result.MatchedCount == 0 {
-		log.Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
+		log.Ctx(ctx).Error().Err(err).Str("component", "SetProductQuantity").Msg("Failed to update product")
 		return errs.ErrNotFound
 	}
 

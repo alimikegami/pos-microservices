@@ -33,7 +33,7 @@ func (r *UserRepositoryImpl) GetUserByEmail(ctx context.Context, email string) (
 	row := r.db.QueryRowxContext(ctx, "SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL", email)
 	err = row.StructScan(&res)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUserByEmail").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetUserByEmail").Msg("")
 		if err == sql.ErrNoRows {
 			return res, nil
 		}
@@ -51,13 +51,13 @@ func (r *UserRepositoryImpl) AddUser(ctx context.Context, data domain.User) (id 
 
 	nstmt, err := tx.PrepareNamedContext(ctx, "INSERT INTO users(name, email, external_id, hashed_password, role_id, created_at, updated_at) VALUES (:name, :email, :external_id, :hashed_password, :role_id, :created_at, :updated_at) returning id")
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddUser").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddUser").Msg("")
 		return
 	}
 
 	err = nstmt.GetContext(ctx, &data.ID, data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddUser").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddUser").Msg("")
 		return
 	}
 
@@ -74,7 +74,7 @@ func (r *UserRepositoryImpl) AddUser(ctx context.Context, data domain.User) (id 
 
 	_, err = tx.NamedExecContext(ctx, "INSERT INTO user_histories(name, email, external_id, hashed_password, role_id, user_id, created_at, updated_at) VALUES (:name, :email, :external_id, :hashed_password, :role_id, :user_id, :created_at, :updated_at)", userHist)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddUser").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddUser").Msg("")
 		return
 	}
 
@@ -87,7 +87,7 @@ func (r *UserRepositoryImpl) GetUserByID(ctx context.Context, id int64) (data do
 	row := r.db.QueryRowxContext(ctx, "SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL", id)
 	err = row.StructScan(&data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUserByEmail").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetUserByEmail").Msg("")
 		if err == sql.ErrNoRows {
 			return data, nil
 		}
@@ -105,7 +105,7 @@ func (r *UserRepositoryImpl) UpdateUser(ctx context.Context, data domain.User) (
 
 	_, err = tx.NamedExecContext(ctx, "UPDATE users SET name=:name, hashed_password=:hashed_password WHERE id=:id AND deleted_at IS NULL", data)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "UpdateUser").Msg("")
 		return
 	}
 
@@ -122,7 +122,7 @@ func (r *UserRepositoryImpl) UpdateUser(ctx context.Context, data domain.User) (
 
 	_, err = tx.NamedExecContext(ctx, "INSERT INTO user_histories(name, email, external_id, hashed_password, role_id, user_id, created_at, updated_at) VALUES (:name, :email, :external_id, :hashed_password, :role_id, :user_id, :created_at, :updated_at)", userHist)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "UpdateUser").Msg("")
 		return
 	}
 
@@ -145,13 +145,13 @@ func (r *UserRepositoryImpl) GetUsers(ctx context.Context, filter pkgdto.Filter)
 
 	nstmt, err := r.db.PrepareNamedContext(ctx, query)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUsers").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetUsers").Msg("")
 		return nil, err
 	}
 
 	err = nstmt.SelectContext(ctx, &data, args)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUsers").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "GetUsers").Msg("")
 		return nil, err
 	}
 
@@ -161,7 +161,7 @@ func (r *UserRepositoryImpl) GetUsers(ctx context.Context, filter pkgdto.Filter)
 func (r *UserRepositoryImpl) CountUsers(ctx context.Context, filter pkgdto.Filter) (count int64, err error) {
 	err = r.db.GetContext(ctx, &count, "SELECT COUNT(id) FROM users WHERE deleted_at IS NULL")
 	if err != nil {
-		log.Error().Err(err).Str("component", "CountUsers").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "CountUsers").Msg("")
 		return 0, err
 	}
 

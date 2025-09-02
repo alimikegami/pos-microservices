@@ -14,6 +14,7 @@ import (
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/infrastructure/database/mongodb"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/infrastructure/message-queue/kafka"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/infrastructure/tracing"
+	localmiddleware "github.com/alimikegami/point-of-sales/product-command-service/internal/middleware"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/product-command-service/internal/service"
 	"github.com/alimikegami/point-of-sales/product-command-service/pkg/dto"
@@ -72,6 +73,7 @@ func main() {
 
 	// Used empty string so that metrics are not prefixed with the service name making it easier to aggregate across services
 	e.Use(echoprometheus.NewMiddleware(""))
+	e.Use(localmiddleware.Logger)
 
 	go func() {
 		metrics := echo.New()

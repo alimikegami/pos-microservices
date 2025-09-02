@@ -30,7 +30,7 @@ func (c *Controller) AddOrder(e echo.Context) error {
 	payload := dto.OrderRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddOrder").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "AddOrder").Msg("")
 	}
 
 	resp, err := c.service.AddOrder(e.Request().Context(), payload)
@@ -45,7 +45,7 @@ func (c *Controller) MidtransPaymentWebhook(e echo.Context) error {
 	payload := dto.PaymentNotification{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "MidtransPaymentWebhook").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "MidtransPaymentWebhook").Msg("")
 	}
 
 	err = c.service.MidtransPaymentWebhook(e.Request().Context(), payload)
@@ -61,7 +61,7 @@ func (c *Controller) GetOrders(e echo.Context) error {
 	filter := pkgdto.Filter{}
 	err := e.Bind(&filter)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrders").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "GetOrders").Msg("")
 		return response.WriteErrorResponse(e, err, nil)
 	}
 
@@ -78,7 +78,7 @@ func (c *Controller) GetOrderDetails(e echo.Context) error {
 	id := e.Param("id")
 	idInt64, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetOrderDetails").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "GetOrderDetails").Msg("")
 		return response.WriteErrorResponse(e, err, nil)
 	}
 

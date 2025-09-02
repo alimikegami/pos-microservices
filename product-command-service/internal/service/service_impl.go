@@ -63,7 +63,7 @@ func (s *ProductServiceImpl) AddProduct(ctx context.Context, data dto.ProductReq
 		if err == nil {
 			break
 		}
-		log.Error().Err(err).Str("component", "AddProduct").Msg("")
+		log.Ctx(ctx).Error().Err(err).Str("component", "AddProduct").Msg("")
 		time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
 	}
 

@@ -27,7 +27,7 @@ func (c *Controller) AddProduct(e echo.Context) error {
 	payload := dto.ProductRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddProduct").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "AddProduct").Msg("")
 	}
 
 	err = c.service.AddProduct(e.Request().Context(), payload)
@@ -43,7 +43,7 @@ func (c *Controller) UpdateProductsQuantity(e echo.Context) error {
 	payload := dto.OrderRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateProductsQuantity").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "UpdateProductsQuantity").Msg("")
 	}
 
 	err = c.service.UpdateProductsQuantity(e.Request().Context(), payload)
@@ -69,7 +69,7 @@ func (c *Controller) UpdateProduct(e echo.Context) error {
 	payload := dto.ProductRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateProduct").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "UpdateProduct").Msg("")
 	}
 
 	payload.ID = id
@@ -86,7 +86,7 @@ func (c *Controller) UpdateProductQuantity(e echo.Context) error {
 	payload := dto.ProductQuantityRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateProduct").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "UpdateProduct").Msg("")
 	}
 
 	payload.ProductID = id

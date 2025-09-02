@@ -25,7 +25,7 @@ func (c *Controller) GetProducts(e echo.Context) error {
 	filter := pkgdto.Filter{}
 	err := e.Bind(&filter)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddProduct").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "AddProduct").Msg("")
 	}
 
 	responsePayload, err := c.service.GetProducts(e.Request().Context(), filter)
@@ -41,7 +41,7 @@ func (c *Controller) GetProductsPrice(e echo.Context) error {
 	filter := pkgdto.Filter{}
 	err := e.Bind(&filter)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetProductsPrice").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "GetProductsPrice").Msg("")
 	}
 
 	responsePayload, err := c.service.GetProducts(e.Request().Context(), filter)

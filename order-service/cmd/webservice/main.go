@@ -17,6 +17,7 @@ import (
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/message-queue/kafka"
 	paymentgateway "github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/payment-gateway"
 	"github.com/alimikegami/point-of-sales/order-service/internal/infrastructure/tracing"
+	localmiddleware "github.com/alimikegami/point-of-sales/order-service/internal/middleware"
 	"github.com/alimikegami/point-of-sales/order-service/internal/repository"
 	"github.com/alimikegami/point-of-sales/order-service/internal/service"
 	"github.com/alimikegami/point-of-sales/order-service/pkg/dto"
@@ -24,7 +25,6 @@ import (
 	"github.com/go-co-op/gocron/v2"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -89,24 +89,7 @@ func main() {
 		}
 	}()
 
-	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogURI:      true,
-		LogStatus:   true,
-		LogLatency:  true,
-		LogRemoteIP: true,
-		LogMethod:   true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			logger.Info().
-				Str("method", v.Method).
-				Str("URI", v.URI).
-				Int("status", v.Status).
-				Int64("latency", v.Latency.Microseconds()).
-				Str("remote IP", v.RemoteIP).
-				Msg("Request")
-
-			return nil
-		},
-	}))
+	e.Use(localmiddleware.Logger)
 
 	g.GET("/ping", func(c echo.Context) error {
 		return dto.WriteSuccessResponse(c, "Hello, World!")

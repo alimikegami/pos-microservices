@@ -31,7 +31,7 @@ func (c *Controller) AddUser(e echo.Context) error {
 	payload := dto.UserRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "AddUser").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "AddUser").Msg("")
 	}
 
 	err = c.service.AddUser(e.Request().Context(), payload)
@@ -47,7 +47,7 @@ func (c *Controller) Login(e echo.Context) error {
 	payload := dto.UserRequest{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "Login").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "Login").Msg("")
 	}
 
 	respPayload, err := c.service.Login(e.Request().Context(), payload)
@@ -69,7 +69,7 @@ func (c *Controller) UpdateUser(e echo.Context) error {
 	payload := dto.UserRequest{}
 	err = e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "UpdateUser").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "UpdateUser").Msg("")
 	}
 
 	payload.ID = idInt
@@ -85,7 +85,7 @@ func (c *Controller) GetUsers(e echo.Context) error {
 	payload := pkgdto.Filter{}
 	err := e.Bind(&payload)
 	if err != nil {
-		log.Error().Err(err).Str("component", "GetUsers").Msg("")
+		log.Ctx(e.Request().Context()).Error().Err(err).Str("component", "GetUsers").Msg("")
 	}
 
 	resp, err := c.service.GetUsers(e.Request().Context(), payload)
